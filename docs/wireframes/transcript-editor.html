@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting AI — Transcript Editor</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #090D1A;
+    --bg-base: #0F1525;
+    --bg-elevated: #161E33;
+    --bg-hover: #1C2540;
+    --bg-pressed: #243050;
+    --text-primary: #EDF0F5;
+    --text-secondary: #8B92A5;
+    --text-tertiary: #5B6378;
+    --accent: #22D3EE;
+    --accent-muted: rgba(34, 211, 238, 0.10);
+    --border-default: rgba(139, 146, 165, 0.12);
+    --border-emphasis: rgba(139, 146, 165, 0.24);
+    --border-focus: rgba(34, 211, 238, 0.40);
+    --speaker-1: #22D3EE;
+    --speaker-2: #A78BFA;
+    --speaker-3: #34D399;
+    --speaker-4: #FBBF24;
+    --success: #22C55E;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --info: #60A5FA;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Lexend', sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 256px; min-width: 256px;
+    background: var(--bg-deep);
+    border-right: 1px solid var(--border-default);
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; margin: 2px 8px; border-radius: 8px;
+    color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all 150ms ease-out;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-muted); color: var(--accent);
+    border-left-color: var(--accent); border-radius: 0 8px 8px 0;
+    margin-left: 0; padding-left: 14px;
+  }
+  .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  /* Main Layout */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Top Bar */
+  .topbar {
+    height: 56px; min-height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .btn-back {
+    background: none; border: none; color: var(--text-secondary);
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    font-family: 'Lexend', sans-serif; font-size: 14px; font-weight: 500;
+    transition: color 150ms;
+  }
+  .btn-back:hover { color: var(--text-primary); }
+  .btn-back svg { width: 18px; height: 18px; }
+
+  .meeting-title-bar {
+    font-size: 15px; font-weight: 600; color: var(--text-primary);
+  }
+
+  .topbar-actions {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-icon {
+    background: none; border: 1px solid var(--border-default);
+    color: var(--text-secondary); cursor: pointer;
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-emphasis); }
+  .btn-icon svg { width: 18px; height: 18px; }
+
+  .btn-export {
+    background: var(--accent); color: var(--bg-deep); border: none;
+    padding: 8px 16px; border-radius: 8px;
+    font-family: 'Lexend', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 150ms;
+  }
+  .btn-export:hover { background: #3DD9F1; }
+  .btn-export:active { transform: scale(0.98); }
+  .btn-export svg { width: 16px; height: 16px; }
+
+  /* Content Area: 2-panel */
+  .content-area { flex: 1; display: flex; overflow: hidden; }
+
+  /* Transcript Panel */
+  .transcript-panel {
+    flex: 1; overflow-y: auto; padding: 24px;
+  }
+
+  /* Transcript Header */
+  .transcript-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .transcript-header h2 {
+    font-size: 16px; font-weight: 600; color: var(--text-primary);
+  }
+  .transcript-header-meta {
+    font-size: 12px; color: var(--text-tertiary);
+  }
+
+  /* Segment */
+  .segment {
+    display: grid; grid-template-columns: 68px 1fr;
+    gap: 0; padding: 14px 12px; border-radius: 8px;
+    border-bottom: 1px solid var(--border-default);
+    cursor: pointer;
+    transition: background 150ms ease-out;
+    position: relative;
+  }
+  .segment:hover { background: var(--bg-hover); }
+  .segment:hover .segment-actions { opacity: 1; }
+
+  .segment-timestamp {
+    font-family: 'Lexend', sans-serif;
+    font-size: 12px; color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums; line-height: 1.6;
+    padding-top: 2px;
+  }
+
+  .segment-content { display: flex; flex-direction: column; gap: 4px; }
+
+  .segment-speaker {
+    font-size: 12px; font-weight: 600; padding: 2px 10px;
+    border-radius: 9999px; display: inline-flex; width: fit-content;
+    letter-spacing: 0.01em;
+  }
+  .speaker-1 { background: rgba(34, 211, 238, 0.12); color: var(--speaker-1); }
+  .speaker-2 { background: rgba(167, 139, 250, 0.12); color: var(--speaker-2); }
+  .speaker-3 { background: rgba(52, 211, 153, 0.12); color: var(--speaker-3); }
+  .speaker-4 { background: rgba(251, 191, 36, 0.12); color: var(--speaker-4); }
+
+  .segment-text {
+    font-family: 'Atkinson Hyperlegible', sans-serif;
+    font-size: 15px; color: var(--text-primary);
+    line-height: 1.6; white-space: pre-wrap;
+  }
+
+  .segment-text[contenteditable="true"] {
+    outline: none; padding: 4px; margin: -4px; border-radius: 4px;
+    background: var(--bg-pressed);
+    border: 1px solid var(--border-focus);
+  }
+
+  .segment-actions {
+    opacity: 0; display: flex; gap: 2px;
+    position: absolute; top: 10px; right: 12px;
+    transition: opacity 150ms;
+  }
+  .segment-action-btn {
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    color: var(--text-secondary); cursor: pointer;
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .segment-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .segment-action-btn svg { width: 14px; height: 14px; }
+  .segment-action-btn.danger:hover { color: var(--error); background: rgba(239, 68, 68, 0.06); border-color: rgba(239, 68, 68, 0.2); }
+
+  /* Summary Panel */
+  .summary-panel {
+    width: 380px; min-width: 380px;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border-default);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .summary-tabs {
+    display: flex; border-bottom: 1px solid var(--border-default);
+  }
+  .summary-tab {
+    flex: 1; padding: 14px 16px; background: none; border: none;
+    cursor: pointer; font-family: 'Lexend', sans-serif;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-tertiary);
+    border-bottom: 2px solid transparent;
+    transition: all 150ms;
+    text-align: center;
+  }
+  .summary-tab:hover { color: var(--text-secondary); }
+  .summary-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .summary-content {
+    flex: 1; overflow-y: auto; padding: 24px;
+  }
+
+  .summary-section { margin-bottom: 24px; }
+  .summary-section:last-child { margin-bottom: 0; }
+  .summary-section-title {
+    font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .summary-section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border-default);
+  }
+
+  .summary-card {
+    background: var(--bg-base); border-radius: 8px;
+    padding: 14px; margin-bottom: 8px;
+    border: 1px solid var(--border-default);
+  }
+  .summary-card p {
+    font-family: 'Atkinson Hyperlegible', sans-serif;
+    font-size: 14px; color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .action-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border-default);
+  }
+  .action-item:last-child { border-bottom: none; }
+  .action-checkbox {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--border-emphasis);
+    background: none; cursor: pointer; flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .action-checkbox.done {
+    background: var(--success); border-color: var(--success);
+  }
+  .action-checkbox.done::after {
+    content: '✓'; color: var(--bg-deep); font-size: 12px; font-weight: 700;
+  }
+  .action-text {
+    font-family: 'Atkinson Hyperlegible', sans-serif;
+    font-size: 14px; color: var(--text-primary); line-height: 1.5;
+  }
+  .action-text .assignee {
+    font-family: 'Lexend', sans-serif;
+    font-size: 11px; color: var(--speaker-1); font-weight: 600;
+  }
+
+  .risk-item {
+    padding: 10px 0; border-bottom: 1px solid var(--border-default);
+  }
+  .risk-item:last-child { border-bottom: none; }
+  .risk-severity {
+    font-size: 11px; font-weight: 600; margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .risk-severity.high { color: var(--error); }
+  .risk-severity.medium { color: var(--warning); }
+  .risk-severity.low { color: var(--success); }
+  .risk-text {
+    font-family: 'Atkinson Hyperlegible', sans-serif;
+    font-size: 14px; color: var(--text-secondary); line-height: 1.5;
+  }
+
+  /* Scrollbar */
+  .transcript-panel::-webkit-scrollbar,
+  .summary-content::-webkit-scrollbar { width: 6px; }
+  .transcript-panel::-webkit-scrollbar-track,
+  .summary-content::-webkit-scrollbar-track { background: transparent; }
+  .transcript-panel::-webkit-scrollbar-thumb,
+  .summary-content::-webkit-scrollbar-thumb { background: var(--border-emphasis); border-radius: 3px; }
+
+  .privacy-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; margin: 0 8px 16px; border-radius: 8px;
+    background: rgba(34, 197, 94, 0.06); color: var(--success);
+    font-size: 12px; font-weight: 500;
+  }
+  .privacy-badge svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  /* Export dropdown */
+  .export-dropdown {
+    position: relative;
+  }
+  .export-menu {
+    display: none; position: absolute; top: 100%; right: 0;
+    margin-top: 4px; background: var(--bg-elevated);
+    border: 1px solid var(--border-emphasis); border-radius: 8px;
+    overflow: hidden; z-index: 100; min-width: 140px;
+  }
+  .export-menu.show { display: block; }
+  .export-menu-item {
+    padding: 10px 16px; cursor: pointer; font-size: 13px;
+    color: var(--text-secondary); transition: 150ms;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Lexend', sans-serif;
+  }
+  .export-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .export-menu-item svg { width: 16px; height: 16px; }
+
+  @media (prefers-reduced-motion) {
+    .segment, .nav-item, .segment-actions, .summary-tab,
+    .btn-back, .btn-icon, .btn-export, .export-menu-item { transition: none; }
+    .btn-export:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div style="display:flex;align-items:center;gap:12px;padding:20px 16px;">
+    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#090D1A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </div>
+    <span style="font-size:18px;font-weight:700;color:var(--text-primary);">Meeting AI</span>
+  </div>
+  <nav style="flex:1;padding-top:8px;">
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      All Meetings
+    </div>
+  </nav>
+  <div style="padding:0 8px 8px;">
+    <div class="privacy-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      All data stored locally
+    </div>
+    <div style="padding:8px 16px;font-size:11px;color:var(--text-tertiary);">v0.1.0</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="btn-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="meeting-title-bar">Q3 Product Roadmap Review</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-icon" title="Search transcript">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <div class="export-dropdown">
+        <button class="btn-export" onclick="document.getElementById('exportMenu').classList.toggle('show')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <div class="export-menu" id="exportMenu">
+          <div class="export-menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            TXT — Plain Text
+          </div>
+          <div class="export-menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            SRT — Subtitle
+          </div>
+          <div class="export-menu-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            VTT — WebVTT
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content Area -->
+  <div class="content-area">
+
+    <!-- Transcript Panel -->
+    <div class="transcript-panel">
+      <div class="transcript-header">
+        <h2>Transcript</h2>
+        <span class="transcript-header-meta">4 speakers · 28 segments · 45:12 duration</span>
+      </div>
+
+      <!-- Segment 1 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:00:02</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-1">Alice Chen</span>
+          <div class="segment-text">Alright everyone, let's get started. Today we're reviewing the Q3 product roadmap. I want to focus on prioritization — we have a lot of competing requests and limited engineering bandwidth.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split at cursor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 2 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:00:18</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-2">Bob Martinez</span>
+          <div class="segment-text">Thanks Alice. I've shared the current backlog in Slack. The analytics dashboard feature alone is estimated at 8 story points, and we have three teams asking for it this quarter.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 3 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:00:32</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-3">Carol Nguyen</span>
+          <div class="segment-text">From the user research side, we ran a survey with 200 beta users last week. 78% ranked real-time data visualization as their top priority. The demand is real, not just internal pressure.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 4 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:01:05</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-1">Alice Chen</span>
+          <div class="segment-text">That's compelling data. Let's commit to the analytics dashboard for Q3 then. Bob, I want you to lead the design sprint starting next Monday. Carol, can your team finish the user journey mapping by Friday so we have that as input?</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 5 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:01:22</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-2">Bob Martinez</span>
+          <div class="segment-text">Sounds good. I'll schedule the design sprint kickoff for Monday 9 AM. Quick question though — do we have budget for an additional frontend contractor? The timeline is tight with our current headcount.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 6 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:01:45</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-4">David Kim</span>
+          <div class="segment-text">I can check with finance. We might have some runway from the Q2 underspend. Let me get back to you by Wednesday. One concern though — we should also think about the API rate limiting issue that came up in the incident review. If analytics is going to be real-time, we need to address that first.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 7 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:02:30</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-1">Alice Chen</span>
+          <div class="segment-text">Great catch David. Let's add the rate limiting fix as a prerequisite for the analytics work. I don't want us building on a shaky foundation. Anything else before we wrap up the roadmap discussion?</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Segment 8 -->
+      <div class="segment">
+        <span class="segment-timestamp">00:02:55</span>
+        <div class="segment-content">
+          <span class="segment-speaker speaker-3">Carol Nguyen</span>
+          <div class="segment-text">One quick thing — the design team has been asking about dark mode support. Should we bundle that with the analytics release or keep it separate? It's mostly CSS variables work, maybe 2-3 points.</div>
+        </div>
+        <div class="segment-actions">
+          <button class="segment-action-btn" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="segment-action-btn" title="Split"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 3v18"/></svg></button>
+          <button class="segment-action-btn danger" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Summary Panel -->
+    <aside class="summary-panel">
+      <!-- Tabs -->
+      <div class="summary-tabs">
+        <button class="summary-tab active">Overview</button>
+        <button class="summary-tab">Decisions</button>
+        <button class="summary-tab">Actions</button>
+        <button class="summary-tab">Risks</button>
+      </div>
+
+      <!-- Content -->
+      <div class="summary-content">
+
+        <!-- Overview -->
+        <div class="summary-section">
+          <div class="summary-section-title">Summary</div>
+          <div class="summary-card">
+            <p>Alice Chen led the Q3 product roadmap review with Bob Martinez, Carol Nguyen, and David Kim. The team prioritized the analytics dashboard feature based on user research showing 78% demand. Bob will lead the design sprint starting Monday. David flagged the API rate limiting issue as a prerequisite. Carol raised dark mode bundling for consideration.</p>
+          </div>
+        </div>
+
+        <!-- Key Decisions -->
+        <div class="summary-section">
+          <div class="summary-section-title">Key Decisions</div>
+          <div class="summary-card">
+            <p><strong style="color:var(--text-primary);">Analytics dashboard is Q3 top priority</strong><br>Based on user survey of 200 beta users, 78% ranked real-time visualization as #1 feature.</p>
+          </div>
+          <div class="summary-card">
+            <p><strong style="color:var(--text-primary);">Design sprint kickoff Monday 9 AM</strong><br>Bob Martinez to lead. Carol's team to provide user journey mapping by Friday as design input.</p>
+          </div>
+          <div class="summary-card">
+            <p><strong style="color:var(--text-primary);">Rate limiting fix before analytics</strong><br>David Kim noted the API rate limiting issue from the incident review must be resolved first to support real-time data.</p>
+          </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="summary-section">
+          <div class="summary-section-title">Action Items</div>
+          <div class="action-item">
+            <div class="action-checkbox"></div>
+            <div class="action-text">Lead the analytics dashboard design sprint — kickoff Monday 9 AM <br><span class="assignee">Bob Martinez</span></div>
+          </div>
+          <div class="action-item">
+            <div class="action-checkbox"></div>
+            <div class="action-text">Complete user journey mapping by Friday for design sprint input <br><span class="assignee">Carol Nguyen</span></div>
+          </div>
+          <div class="action-item">
+            <div class="action-checkbox done"></div>
+            <div class="action-text">Check budget with finance for frontend contractor <br><span class="assignee">David Kim</span></div>
+          </div>
+          <div class="action-item">
+            <div class="action-checkbox"></div>
+            <div class="action-text">Scope API rate limiting fix as prerequisite for analytics <br><span class="assignee">Alice Chen</span></div>
+          </div>
+        </div>
+
+        <!-- Risks -->
+        <div class="summary-section">
+          <div class="summary-section-title">Risks</div>
+          <div class="risk-item">
+            <div class="risk-severity high">High</div>
+            <div class="risk-text">API rate limiting could block real-time analytics if not fixed before development starts.</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-severity medium">Medium</div>
+            <div class="risk-text">Tight timeline with current headcount — may need contractor to meet Q3 deadline.</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-severity low">Low</div>
+            <div class="risk-text">Dark mode bundling could add scope creep — treat as separate initiative unless trivial.</div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<script>
+  // Close export menu when clicking outside
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('exportMenu');
+    if (menu && !e.target.closest('.export-dropdown')) {
+      menu.classList.remove('show');
+    }
+  });
+</script>
+
+</body>
+</html>
