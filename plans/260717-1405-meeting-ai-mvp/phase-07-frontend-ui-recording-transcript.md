@@ -1,9 +1,12 @@
 ---
 phase: 7
-title: "Frontend UI - Recording & Transcript"
-status: pending
+title: Frontend UI - Recording & Transcript
+status: completed
 priority: P1
-dependencies: [3, 4, 6]
+dependencies:
+  - 3
+  - 4
+  - 6
 ---
 
 # Phase 7: Frontend UI - Recording & Transcript
@@ -14,8 +17,9 @@ Build the recording view (waveform, timer, controls) and transcript editor (edit
 
 ## Requirements
 
-- **Functional:** Start/stop/pause recording with visual feedback (pulsing dot, waveform, timer). View/edit transcript with timestamps and speaker labels. Split/merge/delete segments. View AI summary in tabbed panel. Trigger transcription and summary generation from UI.
+- **Functional:** Start/stop/pause recording with visual feedback (pulsing dot, waveform, timer). View/edit transcript with timestamps and speaker labels. Rename speakers (click pill, type name). Split/merge/delete segments. View AI summary in tabbed panel. Trigger transcription and summary generation from UI.
 - **Non-functional:** Waveform CSS-animated bars (no audio processing library). Double-click to edit segments. `prefers-reduced-motion` respected.
+<!-- Updated: Validation Session 1 - Added speaker renaming -->
 
 ## Architecture
 
@@ -202,13 +206,62 @@ const SPEAKER_COLORS = [
   'bg-speaker-4/20 text-speaker-4',
 ];
 
-export function SpeakerPill({ speaker, index }: { speaker: string; index: number }) {
+export function SpeakerPill({
+  speaker,
+  index,
+  onRename,
+}: {
+  speaker: string;
+  index: number;
+  onRename?: (newName: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(speaker);
+
+  if (editing) {
+    return (
+      <input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          if (name !== speaker) onRename?.(name);
+        }}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        className="bg-bg-base border border-border-focus rounded-full px-2.5 py-0.5
+                   font-ui font-semibold text-xs text-primary w-32 focus:outline-none"
+        autoFocus
+      />
+    );
+  }
+
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5
-                     font-ui font-semibold text-xs ${SPEAKER_COLORS[index % 4]}`}>
+    <button
+      onClick={() => setEditing(true)}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5
+                  font-ui font-semibold text-xs cursor-pointer hover:ring-1 hover:ring-accent/30
+                  ${SPEAKER_COLORS[index % 4]}`}
+      title="Click to rename speaker"
+    >
       {speaker}
-    </span>
+    </button>
   );
+}
+```
+
+### Speaker Rename Logic
+
+```typescript
+// When speaker pill renamed, update ALL segments with that label
+async function handleSpeakerRename(meetingId: string, oldLabel: string, newLabel: string) {
+  const segments = await invoke<Segment[]>('get_segments', { meetingId });
+  const affectedIds = segments
+    .filter(s => s.speaker_label === oldLabel)
+    .map(s => s.id);
+
+  for (const id of affectedIds) {
+    await invoke('update_segment', { id, speaker_label: newLabel });
+  }
 }
 ```
 

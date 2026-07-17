@@ -1,21 +1,23 @@
 ---
 phase: 4
-title: "Speech-to-Text Integration"
-status: pending
+title: Speech-to-Text Integration
+status: completed
 priority: P1
-dependencies: [3]
+dependencies:
+  - 3
 ---
 
 # Phase 4: Speech-to-Text Integration
 
 ## Overview
 
-Implement OpenAI Whisper API transcription. Send audio via multipart/form-data, chunk files >25MB on silence boundaries, parse `verbose_json` response into segments. Store segments in SQLite. Display progress to user during transcription.
+Implement OpenAI Whisper-1 and Gemini 2.5 Flash STT providers via shared `SpeechProvider` interface. Compress raw WAV to MP3 (64kbps mono) before upload to fit 25MB Whisper limit; silence-based chunker for >25MB files. Parse responses into timestamped segments, store in SQLite.
+<!-- Updated: Validation Session 1 - Added Gemini STT provider + MP3 compression + silence chunker -->
 
 ## Requirements
 
-- **Functional:** Transcribe audio file via Whisper-1 API. Handle <25MB files (single request) and >25MB files (chunked). Parse segments with start/end timestamps and text.
-- **Non-functional:** Retry on 429/5xx with exponential backoff. Show progress per chunk. Handle API key errors gracefully.
+- **Functional:** Transcribe audio via Whisper-1 or Gemini 2.5 Flash. Compress WAV to MP3 before upload (64kbps mono). Chunk >25MB files on silence boundaries. Parse segments with start/end timestamps and text.
+- **Non-functional:** Retry on 429/5xx with exponential backoff. Show progress per chunk. Handle API key errors gracefully. Shared provider interface for easy extension.
 
 ## Architecture
 
@@ -26,8 +28,9 @@ packages/speech/
 │   ├── types.ts            # SpeechProvider interface, Transcript, Segment
 │   ├── providers/
 │   │   ├── whisper.ts      # OpenAI Whisper-1 implementation
-│   │   └── gemini.ts       # Gemini (future: transcription via Gemini)
-│   └── chunker.ts          # Silence-based audio chunking (>25MB)
+│   │   └── gemini.ts       # Gemini 2.5 Flash STT implementation
+│   ├── chunker.ts          # Silence-based audio chunking (>25MB)
+│   └── compressor.ts       # WAV → MP3 compression (64kbps mono)
 ```
 
 ### Provider Interface
@@ -78,50 +81,99 @@ export class WhisperProvider implements SpeechProvider {
 
 ```typescript
 // packages/speech/src/chunker.ts
-export function chunkBySize(filePath: string, maxBytes: number = 24 * 1024 * 1024): string[] {
-  // ponytail: simple byte-split, no silence detection for MVP
-  // If chunks overlap mid-word, Whisper handles it fine
-  // Add silence-boundary detection (pydub-style) if quality degrades
+
+/**
+ * Chunk audio on silence boundaries for clean transcription splits.
+ * Uses Web Audio API to detect silence regions (RMS below threshold for >500ms).
+ * Each chunk stays under maxBytes (~24MB to leave headroom under 25MB limit).
+ */
+export async function chunkOnSilence(
+  audioBuffer: AudioBuffer,
+  maxChunkBytes: number = 24 * 1024 * 1024
+): Promise<AudioBuffer[]> {
+  // 1. Compute RMS energy in 100ms windows
+  // 2. Mark windows where RMS < threshold as silence
+  // 3. Split at longest silence regions that keep chunks under size limit
+  // 4. Return array of non-overlapping AudioBuffers
+}
+
+export async function transcribeWithChunking(
+  audioPath: string,
+  provider: SpeechProvider,
+  apiKey: string,
+): Promise<TranscriptResult> {
+  // 1. Compress to MP3 (see compressor.ts)
+  const mp3Path = await compressToMp3(audioPath);
+  const fileSize = (await stat(mp3Path)).size;
+
+  if (fileSize <= maxChunkBytes) {
+    return provider.transcribe(mp3Path, apiKey);
+  }
+
+  // 2. Decode MP3 to AudioBuffer for silence analysis
+  // 3. Split on silence boundaries
+  // 4. Transcribe each chunk, offset timestamps
+  // 5. Merge segments
 }
 ```
 
-Actually implement silence-based:
+### Gemini STT Provider
 
 ```typescript
-// packages/speech/src/chunker.ts
-export async function chunkAudio(
-  filePath: string,
-  apiKey: string,
-  options: { maxChunkBytes?: number }
-): Promise<TranscriptResult> {
-  const maxBytes = options.maxChunkBytes ?? 24 * 1024 * 1024;
-  const fileSize = (await stat(filePath)).size;
+// packages/speech/src/providers/gemini.ts
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-  if (fileSize <= maxBytes) {
-    // Single request — no chunking needed
-    return singleTranscribe(filePath, apiKey);
+export class GeminiSpeechProvider implements SpeechProvider {
+  name = 'gemini';
+
+  async transcribe(audioPath: string, apiKey: string): Promise<TranscriptResult> {
+    // Gemini accepts audio inline (base64) or via Files API
+    // For MVP: use inline base64 (files under ~20MB after compression)
+
+    const audioBytes = await readFile(audioPath);
+    const base64Audio = Buffer.from(audioBytes).toString('base64');
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inlineData: { mimeType: 'audio/mp3', data: base64Audio } },
+            { text: 'Transcribe this audio. Return JSON with this structure: {"segments": [{"start": number_seconds, "end": number_seconds, "text": "transcript text"}]}. Only return the JSON, no other text.' }
+          ]
+        }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+      }),
+    });
+
+    // Parse Gemini response and map to TranscriptResult
+    // Note: Gemini doesn't provide native timestamps — it returns them in prompted format
+    // Timestamps will be approximate; Whisper is the accurate option
   }
+}
+```
 
-  // ponytail: chunk on fixed 10-min intervals (~6MB at 16-bit mono 16kHz)
-  // Whisper timestamps are relative per chunk → add offset when stitching
-  const chunks = splitAudioFile(filePath, 600); // 10-min chunks
-  const allSegments: TranscriptSegment[] = [];
-  let timeOffset = 0;
+### Audio Compression
 
-  for (const chunk of chunks) {
-    const result = await singleTranscribe(chunk, apiKey);
-    // Offset timestamps
-    for (const seg of result.segments) {
-      allSegments.push({
-        start: seg.start + timeOffset,
-        end: seg.end + timeOffset,
-        text: seg.text,
-      });
-    }
-    timeOffset += result.duration;
-  }
+```typescript
+// packages/speech/src/compressor.ts
 
-  return { segments: allSegments, duration: timeOffset };
+/**
+ * Compress WAV to MP3 64kbps mono before upload.
+ * 10MB/min WAV becomes ~0.5MB/min MP3 — 50 min fits in 25MB limit.
+ *
+ * Implementation options:
+ * - Browser AudioContext + MediaRecorder (preferred, no native deps)
+ * - Tauri-side: shell out to ffmpeg if available
+ *
+ * ponytail: browser AudioContext first, fallback to Tauri ffmpeg if needed
+ */
+export async function compressToMp3(wavPath: string): Promise<string> {
+  // 1. Read WAV via Tauri fs plugin
+  // 2. Decode in AudioContext
+  // 3. Re-encode via MediaRecorder at 64kbps mono
+  // 4. Write MP3 to temp dir, return path
 }
 ```
 
@@ -169,24 +221,32 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
 ## Implementation Steps
 
 1. Create `packages/speech/src/types.ts` with provider interface and types
-2. Implement `packages/speech/src/providers/whisper.ts`:
+2. Implement `packages/speech/src/compressor.ts`: WAV → MP3 64kbps mono via browser AudioContext + MediaRecorder
+3. Implement `packages/speech/src/chunker.ts`:
+   - `chunkOnSilence()`: RMS energy detection in 100ms windows, split at longest silence gaps
+   - `transcribeWithChunking()`: orchestrates compress → chunk → transcribe → stitch
+4. Implement `packages/speech/src/providers/whisper.ts`:
    - `singleTranscribe(audioPath, apiKey)` → parses verbose_json response
    - Multipart/form-data with `file`, `model`, `response_format`, `timestamp_granularities[]`
    - Error handling for API key, rate limits, format errors
-3. Implement `packages/speech/src/chunker.ts`:
-   - Check file size vs 25MB limit
-   - Split audio if needed (use fixed-time splitting; WAV headers let us calculate byte offsets)
-   - Stitch results with time offset
-4. Create frontend action in `packages/core/src/commands/transcription.ts`:
-   - Orchestrate: read audio path, read API key from DB, call whisper, write segments
-5. Add progress reporting: emit progress events (`total_chunks`, `current_chunk`)
-6. Add retry logic with exponential backoff wrapper
-7. Export via `packages/speech/src/index.ts`
+5. Implement `packages/speech/src/providers/gemini.ts`:
+   - `transcribe(audioPath, apiKey)` → inline base64 audio + transcription prompt
+   - Parse JSON response, handle approximate timestamps
+   - `extractJson()` to handle markdown wrapping (same pattern as Phase 5)
+6. Create frontend action in `packages/core/src/commands/transcription.ts`:
+   - Orchestrate: read audio path, read API key from DB, compress, chunk (if needed), call provider, write segments
+7. Add progress reporting: emit progress events (`total_chunks`, `current_chunk`)
+8. Add retry logic with exponential backoff wrapper
+9. Export via `packages/speech/src/index.ts`
 
 ## Success Criteria
 
-- [ ] Single-file transcription (<25MB) returns correct segments with timestamps
-- [ ] Chunked transcription (>25MB) returns correctly offset timestamps
+- [ ] Whisper-1 STT: single file (<25MB after compression) returns correct segments with timestamps
+- [ ] Gemini STT: returns transcript with approximate timestamps
+- [ ] WAV compressed to MP3 (64kbps mono) before upload
+- [ ] Silence-based chunker splits at quiet gaps, not mid-sentence
+- [ ] Chunked transcription returns correctly offset timestamps
+- [ ] Both providers configurable via settings (user picks one)
 - [ ] API key error returns clear user-facing message (not raw HTTP error)
 - [ ] Rate limit (429) retries succeed after backoff
 - [ ] Segments stored in SQLite via Rust command bridge

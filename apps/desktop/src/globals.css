@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Lexend:wght@400;500;600;700&display=swap');
+
+/* Design tokens from docs/design-guidelines.md */
+@theme {
+  --font-ui: 'Lexend', sans-serif;
+  --font-transcript: 'Atkinson Hyperlegible', sans-serif;
+
+  /* Deep navy palette */
+  --color-bg-deep: #090D1A;
+  --color-bg-base: #0F1525;
+  --color-bg-elevated: #161E33;
+  --color-bg-hover: #1C2540;
+  --color-bg-pressed: #243050;
+
+  /* Text */
+  --color-text-primary: #EDF0F5;
+  --color-text-secondary: #8B92A5;
+  --color-text-tertiary: #5B6378;
+
+  /* Accent */
+  --color-accent: #22D3EE;
+  --color-accent-hover: #3DD9F1;
+  --color-accent-muted: rgba(34, 211, 238, 0.10);
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-success-muted: rgba(34, 197, 94, 0.10);
+  --color-warning: #F59E0B;
+  --color-warning-muted: rgba(245, 158, 11, 0.10);
+  --color-error: #EF4444;
+  --color-error-muted: rgba(239, 68, 68, 0.10);
+  --color-info: #60A5FA;
+  --color-info-muted: rgba(96, 165, 250, 0.10);
+  --color-recording: #EF4444;
+
+  /* Speaker colors */
+  --color-speaker-1: #22D3EE;
+  --color-speaker-2: #A78BFA;
+  --color-speaker-3: #34D399;
+  --color-speaker-4: #FBBF24;
+
+  /* Borders */
+  --color-border-default: rgba(139, 146, 165, 0.12);
+  --color-border-emphasis: rgba(139, 146, 165, 0.24);
+  --color-border-focus: rgba(34, 211, 238, 0.40);
+
+  /* Border radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+}
+
+/* Animations */
+@keyframes waveform {
+  0%, 100% { height: 10%; }
+  50% { height: 90%; }
+}
+
+@keyframes pulse-record {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

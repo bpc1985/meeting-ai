@@ -1,9 +1,11 @@
 ---
 phase: 8
-title: "Export & Polish"
-status: pending
+title: Export & Polish
+status: completed
 priority: P1
-dependencies: [4, 7]
+dependencies:
+  - 4
+  - 7
 ---
 
 # Phase 8: Export & Polish

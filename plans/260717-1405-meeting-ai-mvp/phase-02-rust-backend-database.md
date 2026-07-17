@@ -1,9 +1,10 @@
 ---
 phase: 2
-title: "Rust Backend & Database"
-status: pending
+title: Rust Backend & Database
+status: completed
 priority: P1
-dependencies: [1]
+dependencies:
+  - 1
 ---
 
 # Phase 2: Rust Backend & Database

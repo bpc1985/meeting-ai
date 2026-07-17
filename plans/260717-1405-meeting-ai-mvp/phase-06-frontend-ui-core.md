@@ -1,9 +1,10 @@
 ---
 phase: 6
-title: "Frontend UI - Core"
-status: pending
+title: Frontend UI - Core
+status: completed
 priority: P1
-dependencies: [1]
+dependencies:
+  - 1
 ---
 
 # Phase 6: Frontend UI - Core
@@ -130,7 +131,7 @@ export function ProviderSelector() {
       />
       <ProviderCard
         name="Gemini 2.5 Flash"
-        description="Audio transcription via Gemini"
+        description="Audio transcription via Gemini (timestamps approximate)"
         price="~$0.002/min"
         selected={speechProvider === 'gemini'}
         onSelect={() => setSpeechProvider('gemini')}

@@ -1,0 +1,8 @@
+{
+  "name": "meeting-ai",
+  "private": true,
+  "workspaces": [
+    "apps/desktop",
+    "packages/*"
+  ]
+}

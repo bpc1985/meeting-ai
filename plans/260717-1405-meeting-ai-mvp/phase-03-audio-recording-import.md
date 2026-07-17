@@ -1,16 +1,18 @@
 ---
 phase: 3
-title: "Audio Recording & Import"
-status: pending
+title: Audio Recording & Import
+status: completed
 priority: P1
-dependencies: [1]
+dependencies:
+  - 1
 ---
 
 # Phase 3: Audio Recording & Import
 
 ## Overview
 
-Implement microphone recording using cpal + hound in Rust, exposed via Tauri commands (start/stop/pause). Support drag-and-drop import of existing audio files. Save recordings as 16-bit PCM mono WAV to `app_data_dir/audio/`.
+Implement microphone recording using cpal + hound in Rust, exposed via Tauri commands (start/stop/pause). Pause implemented by stopping WAV + starting new file; WAV chunks merged on final stop. Support drag-and-drop import of existing audio files. Save recordings as 16-bit PCM mono WAV to `app_data_dir/audio/`.
+<!-- Updated: Validation Session 1 - Pause via stop+merge pattern -->
 
 ## Requirements
 
@@ -109,8 +111,10 @@ export const importAudio = (path: string) => invoke<string>('import_audio', { so
 2. Create `audio/mod.rs` with module structure
 3. Implement `audio/recorder.rs`:
    - `start_recording` command: get default input device, build WAV spec, create stream with sample callback
-   - `stop_recording` command: drop stream, finalize WAV, return file path and duration
-   - `pause_recording` / `resume_recording`: toggle stream pause
+   - `stop_recording` command: drop stream, finalize WAV, merge pause chunks if any, return file path and duration
+   - `pause_recording`: drop cpal stream, finalize current WAV chunk, push path to `chunks: Vec<PathBuf>`
+   - `resume_recording`: create new WAV file, start new cpal stream, push path to chunks vec
+   - `merge_wav_files(chunks: &[PathBuf], output: &Path)`: concatenate WAV data chunks into single final file (skip headers from subsequent files)
 4. Implement `audio/import.rs`:
    - Validate file extension, copy to audio dir via `std::fs::copy`
    - Return destination path
@@ -130,8 +134,8 @@ export const importAudio = (path: string) => invoke<string>('import_audio', { so
 ## Success Criteria
 
 - [ ] Microphone recording produces valid WAV file (playable, non-zero audio)
-- [ ] Pause/resume maintains single continuous WAV file
-- [ ] Duration tracked accurately (within 0.5s)
+- [ ] Pause/resume creates WAV chunks, merged into single file on stop (no gaps, no overlaps)
+- [ ] Duration tracked accurately as total non-paused time (within 0.5s)
 - [ ] Import copies audio file to app data directory
 - [ ] No recording = clear error message (not crash)
 - [ ] macOS: TCC microphone permission dialog appears on first record
