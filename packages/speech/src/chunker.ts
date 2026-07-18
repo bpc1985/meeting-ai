@@ -1,5 +1,5 @@
 import type { SpeechProvider, TranscriptResult, TranscriptSegment } from "./types";
-import { compressToMp3 } from "./compressor";
+import { compressAudio } from "./compressor";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { stat } from "@tauri-apps/plugin-fs";
 
@@ -16,15 +16,15 @@ export async function transcribeWithChunking(
   onProgress?: (current: number, total: number) => void
 ): Promise<TranscriptResult> {
   // Step 1: compress to MP3
-  const mp3Path = await compressToMp3(audioPath);
-  const fileStat = await stat(mp3Path);
+  const compressedPath = await compressAudio(audioPath);
+  const fileStat = await stat(compressedPath);
 
   if (fileStat.size <= MAX_CHUNK_BYTES) {
-    return provider.transcribe(mp3Path, apiKey);
+    return provider.transcribe(compressedPath, apiKey);
   }
 
   // Step 2: decode MP3 for silence analysis
-  const audioBytes = await readFile(mp3Path);
+  const audioBytes = await readFile(compressedPath);
   const audioCtx = new AudioContext();
   const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer as ArrayBuffer);
 

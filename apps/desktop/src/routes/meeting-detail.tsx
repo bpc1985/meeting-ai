@@ -59,6 +59,29 @@ export function MeetingDetailPage() {
             {meeting?.duration_secs != null && <p className="text-xs text-text-tertiary mt-1">{fmtDuration(meeting.duration_secs)}</p>}
           </div>
           <div className="flex items-center gap-2">
+            {meeting?.audio_path && (
+              <button
+                onClick={async () => {
+                  const audio = document.getElementById("audio-player") as HTMLAudioElement | null;
+                  if (!audio || !meeting.audio_path) return;
+                  if (audio.src) {
+                    audio.paused ? void audio.play() : audio.pause();
+                    return;
+                  }
+                  // ponytail: read via Tauri fs, create blob URL for playback
+                  const { readFile } = await import("@tauri-apps/plugin-fs");
+                  const bytes = await readFile(meeting.audio_path);
+                  const blob = new Blob([bytes], { type: "audio/wav" });
+                  audio.src = URL.createObjectURL(blob);
+                  void audio.play();
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-md transition-all"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                Play
+              </button>
+            )}
+            <audio id="audio-player" className="hidden" />
             {(!segments || segments.length === 0) && meeting?.audio_path && (
               <button onClick={handleTranscribe} disabled={transcribing}
                 className="flex items-center gap-2 px-3 py-1.5 bg-accent text-bg-deep font-semibold rounded-md text-xs hover:bg-accent-hover disabled:opacity-50 transition-all">

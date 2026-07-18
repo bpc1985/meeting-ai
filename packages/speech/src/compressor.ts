@@ -10,7 +10,7 @@ import { appCacheDir, join } from "@tauri-apps/api/path";
  * ponytail: MediaRecorder produces WebM/Opus, not MP3.
  * Whisper and Gemini both accept WebM natively, so this works for both providers.
  */
-export async function compressToMp3(wavPath: string): Promise<string> {
+export async function compressAudio(wavPath: string): Promise<string> {
   const audioBytes = await readFile(wavPath);
   const audioCtx = new AudioContext();
   const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer as ArrayBuffer);
