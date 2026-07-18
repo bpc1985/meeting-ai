@@ -11,19 +11,22 @@ use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 use std::path::Path;
 use std::sync::Mutex;
+use tauri::AppHandle;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
     pub audio_dir: std::path::PathBuf,
     pub recording: Mutex<RecordingState>,
+    pub app_handle: AppHandle,
 }
 
 impl AppState {
-    pub fn new(db: Connection, audio_dir: std::path::PathBuf) -> Self {
+    pub fn new(db: Connection, audio_dir: std::path::PathBuf, app_handle: AppHandle) -> Self {
         Self {
             db: Mutex::new(db),
             audio_dir,
             recording: Mutex::new(RecordingState::default()),
+            app_handle,
         }
     }
 }

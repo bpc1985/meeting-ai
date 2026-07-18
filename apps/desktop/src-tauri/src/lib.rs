@@ -20,8 +20,9 @@ pub fn run() {
             std::fs::create_dir_all(&audio_dir).expect("failed to create audio dir");
 
             let conn = db::init_db(&app_data_dir).expect("failed to initialize database");
+            let app_handle = app.handle().clone();
 
-            app.manage(AppState::new(conn, audio_dir));
+            app.manage(AppState::new(conn, audio_dir, app_handle));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

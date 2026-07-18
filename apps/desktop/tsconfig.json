@@ -18,7 +18,6 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@meeting-ai/core": ["../../packages/core/src"],
-      "@meeting-ai/ui": ["../../packages/ui/src"],
       "@meeting-ai/speech": ["../../packages/speech/src"],
       "@meeting-ai/llm": ["../../packages/llm/src"],
       "@meeting-ai/export": ["../../packages/export/src"]

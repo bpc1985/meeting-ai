@@ -11,7 +11,6 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@meeting-ai/core": path.resolve(__dirname, "../../packages/core/src"),
-      "@meeting-ai/ui": path.resolve(__dirname, "../../packages/ui/src"),
       "@meeting-ai/speech": path.resolve(__dirname, "../../packages/speech/src"),
       "@meeting-ai/llm": path.resolve(__dirname, "../../packages/llm/src"),
       "@meeting-ai/export": path.resolve(__dirname, "../../packages/export/src"),

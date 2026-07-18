@@ -19,6 +19,12 @@ export function MeetingDetailPage() {
   const [summaryTab, setSummaryTab] = useState<"overview" | "decisions" | "actions" | "risks">("overview");
   const [transcribing, setTranscribing] = useState(false);
 
+  const transcribeLabel = transcribing
+    ? (transcribe.progress
+        ? `Transcribing ${transcribe.progress.current}/${transcribe.progress.total}...`
+        : "Transcribing...")
+    : "Transcribe";
+
   const handleTranscribe = async () => {
     if (!id) return;
     setTranscribing(true);
@@ -56,7 +62,7 @@ export function MeetingDetailPage() {
               <button onClick={handleTranscribe} disabled={transcribing}
                 className="flex items-center gap-2 px-3 py-1.5 bg-accent text-bg-deep font-semibold rounded-md text-xs hover:bg-accent-hover disabled:opacity-50 transition-all">
                 {transcribing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                {transcribing ? "Transcribing..." : "Transcribe"}
+                {transcribing ? transcribeLabel : "Transcribe"}
               </button>
             )}
             {segments && segments.length > 0 && (

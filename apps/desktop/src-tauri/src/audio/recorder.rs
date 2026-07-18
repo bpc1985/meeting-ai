@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::db::AppState;
 
@@ -64,7 +64,12 @@ pub fn start_recording(state: State<AppState>) -> Result<String, String> {
     )));
 
     let writer_clone = writer.clone();
-    let err_fn = |err| eprintln!("cpal stream error: {}", err);
+    let error_handle = state.app_handle.clone();
+    let err_fn = move |err| {
+        let msg = format!("Microphone error: {}", err);
+        eprintln!("{}", msg);
+        let _ = error_handle.emit("recording-error", &msg);
+    };
 
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device
@@ -166,7 +171,12 @@ pub fn resume_recording(state: State<AppState>) -> Result<(), String> {
     )));
 
     let writer_clone = writer.clone();
-    let err_fn = |err| eprintln!("cpal stream error: {}", err);
+    let error_handle = state.app_handle.clone();
+    let err_fn = move |err| {
+        let msg = format!("Microphone error: {}", err);
+        eprintln!("{}", msg);
+        let _ = error_handle.emit("recording-error", &msg);
+    };
 
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device

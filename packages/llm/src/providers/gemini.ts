@@ -1,14 +1,6 @@
 import type { LLMProvider, MeetingSummary } from "../types";
 import { MEETING_SUMMARY_PROMPT } from "../prompts/meeting-summary";
-
-class HttpError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "HttpError";
-    this.status = status;
-  }
-}
+import { withRetry, HttpError } from "@meeting-ai/speech";
 
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -19,17 +11,19 @@ export class GeminiProvider implements LLMProvider {
   async summarize(transcript: string, apiKey: string): Promise<MeetingSummary> {
     const prompt = MEETING_SUMMARY_PROMPT.replace("{transcript}", transcript);
 
-    const response = await fetch(GEMINI_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2048,
-        },
-      }),
-    });
+    const response = await withRetry(() =>
+      fetch(GEMINI_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          },
+        }),
+      })
+    );
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
