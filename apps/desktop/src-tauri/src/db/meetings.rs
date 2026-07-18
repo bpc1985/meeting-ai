@@ -48,14 +48,17 @@ pub fn get_meeting(id: String, state: State<AppState>) -> Result<Meeting, String
 }
 
 #[tauri::command]
-pub fn list_meetings(state: State<AppState>) -> Result<Vec<Meeting>, String> {
+pub fn list_meetings(offset: Option<i32>, limit: Option<i32>, state: State<AppState>) -> Result<Vec<Meeting>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    let off = offset.unwrap_or(0);
+    let lim = limit.unwrap_or(50);
+
     let mut stmt = db
-        .prepare("SELECT id, title, audio_path, duration_secs, created_at, updated_at, status FROM meetings ORDER BY created_at DESC")
+        .prepare("SELECT id, title, audio_path, duration_secs, created_at, updated_at, status FROM meetings ORDER BY created_at DESC LIMIT ?1 OFFSET ?2")
         .map_err(|e| e.to_string())?;
 
     let meetings = stmt
-        .query_map([], |row| {
+        .query_map(params![lim, off], |row| {
             Ok(Meeting {
                 id: row.get(0)?,
                 title: row.get(1)?,

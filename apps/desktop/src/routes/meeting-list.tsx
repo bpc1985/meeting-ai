@@ -1,17 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import { Mic, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMeetings } from "../hooks/use-meetings";
 import { useMeetingStore } from "../stores/meeting-store";
 import { fmtDuration } from "../lib/format";
+import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
 
 export function MeetingListPage() {
-  const { data: meetings, isLoading, refetch } = useMeetings();
+  const { data: meetings, isLoading, refetch, hasMore, loadMore } = useMeetings();
   const searchQuery = useMeetingStore((s) => s.searchQuery);
   const setSearchQuery = useMeetingStore((s) => s.setSearchQuery);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const handleNewRecording = async () => {
     setCreating(true);
@@ -24,6 +26,14 @@ export function MeetingListPage() {
       setCreating(false);
     }
   };
+
+  const shortcuts = useMemo(() => ({
+    "Cmd+n": handleNewRecording,
+    "Cmd+f": () => searchRef.current?.focus(),
+    Escape: () => { setSearchQuery(""); searchRef.current?.blur(); },
+  }), [handleNewRecording, setSearchQuery]);
+
+  useKeyboardShortcuts(shortcuts);
 
   const handleDeleteMeeting = async (id: string) => {
     if (confirm("Delete this meeting and all its data?")) {
@@ -54,6 +64,7 @@ export function MeetingListPage() {
           <input
             type="text"
             placeholder="Search meetings..."
+            ref={searchRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-bg-elevated border border-border-default rounded-md pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-border-focus focus:ring-2 focus:ring-accent/10 outline-none"
@@ -121,6 +132,14 @@ export function MeetingListPage() {
             </div>
           ))}
         </div>
+      )}
+      {hasMore && !searchQuery && (
+        <button
+          onClick={loadMore}
+          className="mt-4 w-full py-3 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-elevated rounded-md transition-all"
+        >
+          Load More
+        </button>
       )}
     </div>
   );

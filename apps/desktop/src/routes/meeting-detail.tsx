@@ -8,6 +8,8 @@ import { formatAsTxt, formatAsSrt } from "@meeting-ai/export";
 import type { TranscriptSegment } from "@meeting-ai/core";
 import type { MeetingSummary, RiskItem } from "@meeting-ai/llm";
 import { fmtDuration, fmtTimestamp } from "../lib/format";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 
 const SPEAKER_COLORS = ["bg-speaker-1/20 text-speaker-1", "bg-speaker-2/20 text-speaker-2", "bg-speaker-3/20 text-speaker-3", "bg-speaker-4/20 text-speaker-4"];
 
@@ -35,11 +37,11 @@ export function MeetingDetailPage() {
   const handleExport = async (format: "txt" | "srt") => {
     if (!segments || !meeting) return;
     const content = format === "txt" ? formatAsTxt(segments as TranscriptSegment[], meeting.title) : formatAsSrt(segments as TranscriptSegment[]);
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `${meeting.title.replace(/[^a-z0-9]/gi, "-")}-${new Date().toISOString().slice(0, 10)}.${format}`;
-    a.click(); URL.revokeObjectURL(url);
+    const ext = format === "txt" ? "txt" : "srt";
+    const defaultName = `${meeting.title.replace(/[^a-z0-9]/gi, "-")}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    const filePath = await save({ defaultPath: defaultName, filters: [{ name: format.toUpperCase(), extensions: [ext] }] });
+    if (!filePath) return;
+    await writeFile(filePath, new TextEncoder().encode(content));
   };
 
   const summary: MeetingSummary | null = dbSummary ? {
@@ -179,6 +181,7 @@ function EditableText({ text, onSave }: { text: string; onSave: (t: string) => v
   if (editing) return (
     <textarea value={value} onChange={(e) => setValue(e.target.value)}
       onBlur={() => { setEditing(false); if (value !== text) onSave(value); }}
+      onKeyDown={(e) => { if (e.key === "Escape") { setValue(text); setEditing(false); } }}
       className="w-full bg-transparent text-base text-text-primary font-transcript resize-none border border-border-focus rounded p-1 outline-none"
       autoFocus rows={2} />
   );
