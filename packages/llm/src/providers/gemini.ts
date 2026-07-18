@@ -1,4 +1,4 @@
-import type { LLMProvider, MeetingSummary } from "../types";
+import type { LLMProvider, AISummary } from "../types";
 import { MEETING_SUMMARY_PROMPT } from "../prompts/meeting-summary";
 import { withRetry, HttpError, extractJson } from "@meeting-ai/speech";
 import { GEMINI_MODEL } from "@meeting-ai/core";
@@ -9,7 +9,7 @@ const GEMINI_API_URL =
 export class GeminiProvider implements LLMProvider {
   name = "gemini";
 
-  async summarize(transcript: string, apiKey: string): Promise<MeetingSummary> {
+  async summarize(transcript: string, apiKey: string): Promise<AISummary> {
     const prompt = MEETING_SUMMARY_PROMPT.replace("{transcript}", transcript);
 
     const response = await withRetry(() =>

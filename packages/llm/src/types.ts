@@ -3,7 +3,7 @@ export interface RiskItem {
   severity: "high" | "medium" | "low";
 }
 
-export interface MeetingSummary {
+export interface AISummary {
   overview: string;
   keyDecisions: string[];
   actionItems: string[];
@@ -12,5 +12,5 @@ export interface MeetingSummary {
 
 export interface LLMProvider {
   name: string;
-  summarize(transcript: string, apiKey: string, options?: Record<string, unknown>): Promise<MeetingSummary>;
+  summarize(transcript: string, apiKey: string, options?: Record<string, unknown>): Promise<AISummary>;
 }

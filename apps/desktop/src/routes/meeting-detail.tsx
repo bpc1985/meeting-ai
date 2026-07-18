@@ -6,7 +6,7 @@ import { useSegments } from "../hooks/use-segments";
 import { useSummary, useTranscription } from "../hooks/use-summary";
 import { formatAsTxt, formatAsSrt } from "@meeting-ai/export";
 import type { TranscriptSegment } from "@meeting-ai/core";
-import type { MeetingSummary, RiskItem } from "@meeting-ai/llm";
+import type { AISummary, RiskItem } from "@meeting-ai/llm";
 import { fmtDuration, fmtTimestamp } from "../lib/format";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
@@ -44,7 +44,7 @@ export function MeetingDetailPage() {
     await writeFile(filePath, new TextEncoder().encode(content));
   };
 
-  const summary: MeetingSummary | null = dbSummary ? {
+  const summary: AISummary | null = dbSummary ? {
     overview: dbSummary.overview ?? "",
     keyDecisions: (() => { try { return JSON.parse(dbSummary.key_decisions ?? "[]") as string[]; } catch { return []; } })(),
     actionItems: (() => { try { return JSON.parse(dbSummary.action_items ?? "[]") as string[]; } catch { return []; } })(),
@@ -188,7 +188,7 @@ function EditableText({ text, onSave }: { text: string; onSave: (t: string) => v
   return <p className="text-base text-text-primary font-transcript leading-relaxed" onDoubleClick={() => setEditing(true)}>{text}</p>;
 }
 
-function SummaryContent({ tab, summary }: { tab: string; summary: MeetingSummary }) {
+function SummaryContent({ tab, summary }: { tab: string; summary: AISummary }) {
   if (tab === "overview") return <p className="text-sm text-text-secondary leading-relaxed">{summary.overview}</p>;
   if (tab === "decisions") return <ul className="space-y-2">{summary.keyDecisions.map((d: string, i: number) => <li key={i} className="text-sm text-text-secondary flex gap-2"><span className="text-accent shrink-0">•</span> {d}</li>)}</ul>;
   if (tab === "actions") return <ul className="space-y-2">{summary.actionItems.map((a: string, i: number) => <li key={i} className="text-sm text-text-secondary flex items-start gap-2"><input type="checkbox" className="mt-0.5 accent-accent" readOnly /><span>{a}</span></li>)}</ul>;
