@@ -1,6 +1,15 @@
 import type { LLMProvider, MeetingSummary } from "../types";
 import { MEETING_SUMMARY_PROMPT } from "../prompts/meeting-summary";
 
+class HttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
@@ -24,11 +33,11 @@ export class GeminiProvider implements LLMProvider {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      if (response.status === 400)
-        throw new Error(`Invalid Gemini API key: ${err?.error?.message ?? "Unknown"}`);
-      throw new Error(
-        `Gemini API error ${response.status}: ${err?.error?.message ?? "Unknown"}`
-      );
+      const message =
+        response.status === 400
+          ? `Invalid Gemini API key: ${err?.error?.message ?? "Unknown"}`
+          : `Gemini API error ${response.status}: ${err?.error?.message ?? "Unknown"}`;
+      throw new HttpError(message, response.status);
     }
 
     const data = await response.json();

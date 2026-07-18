@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useNavigate } from "react-router-dom";
 
@@ -7,45 +7,48 @@ interface StopResult {
   duration_secs: number;
 }
 
+// ponytail: shared interval management — clear on state change or unmount
+function useInterval(callback: () => void, active: boolean) {
+  const savedCallback = useRef(callback);
+  savedCallback.current = callback;
+
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => savedCallback.current(), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+}
+
 export function useRecording() {
   const [state, setState] = useState<"idle" | "recording" | "paused">("idle");
   const [duration, setDuration] = useState(0);
-  const intervalRef = useRef<number | null>(null);
   const navigate = useNavigate();
+
+  useInterval(
+    () => setDuration((d) => d + 1),
+    state === "recording"
+  );
 
   const start = useCallback(async (_meetingId: string) => {
     await invoke<string>("start_recording");
     setState("recording");
     setDuration(0);
-
-    intervalRef.current = window.setInterval(() => {
-      setDuration((d) => d + 1);
-    }, 1000);
   }, []);
 
   const pause = useCallback(async () => {
     await invoke("pause_recording");
     setState("paused");
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
   }, []);
 
   const resume = useCallback(async () => {
     await invoke("resume_recording");
     setState("recording");
-    intervalRef.current = window.setInterval(() => {
-      setDuration((d) => d + 1);
-    }, 1000);
   }, []);
 
   const stop = useCallback(
     async (meetingId: string) => {
       const result = await invoke<StopResult>("stop_recording");
       setState("idle");
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
 
       // Update meeting with audio path + duration
       await invoke("update_meeting", {

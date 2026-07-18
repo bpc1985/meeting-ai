@@ -89,34 +89,43 @@ pub fn update_meeting(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let now = now_iso();
 
+    // Build a single UPDATE with only the fields that are Some
+    let mut sets: Vec<String> = Vec::new();
+    let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
     if let Some(t) = title {
-        db.execute(
-            "UPDATE meetings SET title = ?1, updated_at = ?2 WHERE id = ?3",
-            params![t, now, id],
-        )
-        .map_err(|e| e.to_string())?;
+        sets.push(format!("title = ?{}", values.len() + 1));
+        values.push(Box::new(t));
     }
     if let Some(s) = status {
-        db.execute(
-            "UPDATE meetings SET status = ?1, updated_at = ?2 WHERE id = ?3",
-            params![s, now, id],
-        )
-        .map_err(|e| e.to_string())?;
+        sets.push(format!("status = ?{}", values.len() + 1));
+        values.push(Box::new(s));
     }
     if let Some(p) = audio_path {
-        db.execute(
-            "UPDATE meetings SET audio_path = ?1, updated_at = ?2 WHERE id = ?3",
-            params![p, now, id],
-        )
-        .map_err(|e| e.to_string())?;
+        sets.push(format!("audio_path = ?{}", values.len() + 1));
+        values.push(Box::new(p));
     }
     if let Some(d) = duration_secs {
-        db.execute(
-            "UPDATE meetings SET duration_secs = ?1, updated_at = ?2 WHERE id = ?3",
-            params![d, now, id],
-        )
-        .map_err(|e| e.to_string())?;
+        sets.push(format!("duration_secs = ?{}", values.len() + 1));
+        values.push(Box::new(d));
     }
+
+    if sets.is_empty() {
+        return Ok(());
+    }
+
+    sets.push(format!("updated_at = ?{}", values.len() + 1));
+    values.push(Box::new(now.clone()));
+    values.push(Box::new(id));
+
+    let sql = format!(
+        "UPDATE meetings SET {} WHERE id = ?{}",
+        sets.join(", "),
+        values.len()
+    );
+
+    let params: Vec<&dyn rusqlite::types::ToSql> = values.iter().map(|v| v.as_ref()).collect();
+    db.execute(&sql, params.as_slice()).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -124,7 +133,39 @@ pub fn update_meeting(
 #[tauri::command]
 pub fn delete_meeting(id: String, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Fetch audio_path before deleting
+    let audio_path: Option<String> = db
+        .query_row(
+            "SELECT audio_path FROM meetings WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .ok();
+
     db.execute("DELETE FROM meetings WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+
+    // Delete WAV file from disk (best-effort, don't fail if already gone)
+    if let Some(path) = audio_path {
+        let _ = std::fs::remove_file(&path);
+        // Also clean up cache-dir compressed files with same base id
+        // ponytail: pattern match for leftover chunks too
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            if let Some(stem) = std::path::Path::new(&path).file_stem() {
+                let pattern = parent.join(format!("{}*", stem.to_string_lossy()));
+                if let Ok(entries) = std::fs::read_dir(parent) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        if name_str.starts_with(stem.to_string_lossy().as_ref()) {
+                            let _ = std::fs::remove_file(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }

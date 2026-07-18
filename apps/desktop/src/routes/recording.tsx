@@ -1,6 +1,14 @@
 import { useParams } from "react-router-dom";
 import { useRecording } from "../hooks/use-recording";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+
+// Generate stable bar configs once — avoids Math.random() on every re-render
+const WAVE_BARS = Array.from({ length: 40 }, (_, i) => ({
+  key: i,
+  duration: 0.4 + Math.random() * 0.4,
+  delay: i * 0.05,
+  height: 30 + Math.random() * 70,
+}));
 
 export function RecordingPage() {
   const { id } = useParams<{ id: string }>();
@@ -10,7 +18,7 @@ export function RecordingPage() {
     if (id && state === "idle") {
       start(id);
     }
-  }, [id]);
+  }, [id, state, start]);
 
   const h = Math.floor(duration / 3600);
   const m = Math.floor((duration % 3600) / 60);
@@ -21,12 +29,12 @@ export function RecordingPage() {
     <div className="flex flex-col items-center justify-center h-full gap-10 px-8">
       {/* Waveform */}
       <div className="flex items-center justify-center gap-1 h-24">
-        {Array.from({ length: 40 }, (_, i) => (
-          <div key={i} className="w-1 bg-accent/80 rounded-full"
+        {WAVE_BARS.map((bar) => (
+          <div key={bar.key} className="w-1 bg-accent/80 rounded-full"
             style={{
-              animation: state === "recording" ? `waveform ${0.4 + Math.random() * 0.4}s ease-in-out infinite` : "none",
-              animationDelay: `${i * 0.05}s`,
-              height: state === "recording" ? `${30 + Math.random() * 70}%` : "10%",
+              animation: state === "recording" ? `waveform ${bar.duration}s ease-in-out infinite` : "none",
+              animationDelay: `${bar.delay}s`,
+              height: state === "recording" ? `${bar.height}%` : "10%",
             }} />
         ))}
       </div>

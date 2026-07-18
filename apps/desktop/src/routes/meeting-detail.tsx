@@ -39,7 +39,7 @@ export function MeetingDetailPage() {
     overview: dbSummary.overview ?? "",
     keyDecisions: (() => { try { return JSON.parse(dbSummary.key_decisions ?? "[]") as string[]; } catch { return []; } })(),
     actionItems: (() => { try { return JSON.parse(dbSummary.action_items ?? "[]") as string[]; } catch { return []; } })(),
-    risks: (() => { try { const raw: unknown = JSON.parse(dbSummary.risks ?? "[]"); return (Array.isArray(raw) ? raw.map((s) => { try { return JSON.parse(s as string) as RiskItem; } catch { return { description: String(s), severity: "medium" as const }; } }) : []) as RiskItem[]; } catch { return []; } })(),
+    risks: (() => { try { return JSON.parse(dbSummary.risks ?? "[]") as RiskItem[]; } catch { return []; } })(),
   } : null;
 
   return (
@@ -49,7 +49,7 @@ export function MeetingDetailPage() {
         <div className="flex items-center justify-between p-4 border-b border-border-default">
           <div>
             <h1 className="text-lg font-semibold text-text-primary">{meeting?.title ?? "Meeting"}</h1>
-            {meeting?.duration_secs && <p className="text-xs text-text-tertiary mt-1">{fmtDuration(meeting.duration_secs)}</p>}
+            {meeting?.duration_secs != null && <p className="text-xs text-text-tertiary mt-1">{fmtDuration(meeting.duration_secs)}</p>}
           </div>
           <div className="flex items-center gap-2">
             {(!segments || segments.length === 0) && meeting?.audio_path && (

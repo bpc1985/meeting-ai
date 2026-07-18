@@ -5,11 +5,22 @@ use tauri::State;
 
 #[tauri::command]
 pub fn search_meetings(query: String, state: State<AppState>) -> Result<Vec<SearchResult>, String> {
+    // Guard: empty or whitespace-only query returns empty results
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
     // Escape FTS5 special chars and add prefix matching
-    let escaped = query.replace(|c: char| !c.is_alphanumeric() && c != ' ', " ");
-    let fts_query = format!("{}*", escaped.trim());
+    let escaped = trimmed.replace(|c: char| !c.is_alphanumeric() && c != ' ', " ");
+    let escaped_trimmed = escaped.trim();
+    // If after escaping there's nothing left, return empty
+    if escaped_trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+    let fts_query = format!("{}*", escaped_trimmed);
 
     let mut stmt = db
         .prepare(

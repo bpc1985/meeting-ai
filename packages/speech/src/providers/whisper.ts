@@ -13,9 +13,11 @@ export class WhisperProvider implements SpeechProvider {
     const { readFile } = await import("@tauri-apps/plugin-fs");
     const audioBytes = await readFile(audioPath);
 
-    const blob = new Blob([audioBytes as unknown as BlobPart], { type: "audio/mpeg" });
+    const extension = audioPath.split(".").pop() ?? "webm";
+    const mimeType = extension === "webm" ? "audio/webm" : extension === "mp3" ? "audio/mpeg" : "audio/wav";
+    const blob = new Blob([audioBytes as unknown as BlobPart], { type: mimeType });
     const form = new FormData();
-    form.append("file", blob, "audio.mp3");
+    form.append("file", blob, `audio.${extension}`);
     form.append("model", "whisper-1");
     form.append("response_format", "verbose_json");
     form.append("timestamp_granularities[]", "segment");
@@ -30,10 +32,11 @@ export class WhisperProvider implements SpeechProvider {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      if (response.status === 401) throw new Error("Invalid OpenAI API key");
-      throw new Error(
-        `Whisper API error ${response.status}: ${err?.error?.message ?? "Unknown"}`
-      );
+      const message =
+        response.status === 401
+          ? "Invalid OpenAI API key"
+          : `Whisper API error ${response.status}: ${err?.error?.message ?? "Unknown"}`;
+      throw new (await import("../retry")).HttpError(message, response.status);
     }
 
     const data = await response.json();

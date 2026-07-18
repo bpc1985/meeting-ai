@@ -45,11 +45,11 @@ export class GeminiSpeechProvider implements SpeechProvider {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      if (response.status === 400)
-        throw new Error(`Invalid Gemini API key: ${err?.error?.message ?? "Unknown"}`);
-      throw new Error(
-        `Gemini API error ${response.status}: ${err?.error?.message ?? "Unknown"}`
-      );
+      const message =
+        response.status === 400
+          ? `Invalid Gemini API key: ${err?.error?.message ?? "Unknown"}`
+          : `Gemini API error ${response.status}: ${err?.error?.message ?? "Unknown"}`;
+      throw new (await import("../retry")).HttpError(message, response.status);
     }
 
     const data = await response.json();

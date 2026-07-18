@@ -49,7 +49,7 @@ export function useSummary(meetingId: string | undefined) {
         overview: summary.overview,
         keyDecisions: JSON.stringify(summary.keyDecisions),
         actionItems: JSON.stringify(summary.actionItems),
-        risks: JSON.stringify(summary.risks.map((r) => JSON.stringify(r))),
+        risks: JSON.stringify(summary.risks),
       });
 
       // 5. Update status

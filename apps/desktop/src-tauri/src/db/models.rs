@@ -35,14 +35,6 @@ pub struct Summary {
     pub created_at: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Setting {
-    pub key: String,
-    pub value: String,
-}
-
-// ponytail: minimal search result type — id + title + preview
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchResult {
     pub id: String,
     pub title: String,
