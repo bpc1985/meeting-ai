@@ -1,9 +1,10 @@
 import type { LLMProvider, MeetingSummary } from "../types";
 import { MEETING_SUMMARY_PROMPT } from "../prompts/meeting-summary";
-import { withRetry, HttpError } from "@meeting-ai/speech";
+import { withRetry, HttpError, extractJson } from "@meeting-ai/speech";
+import { GEMINI_MODEL } from "@meeting-ai/core";
 
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export class GeminiProvider implements LLMProvider {
   name = "gemini";
@@ -36,7 +37,7 @@ export class GeminiProvider implements LLMProvider {
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    const json = extractJson(text);
+    const json = extractJson<Record<string, unknown>>(text, () => ({ overview: text }));
 
     return {
       overview: String(json.overview ?? ""),
@@ -51,22 +52,5 @@ export class GeminiProvider implements LLMProvider {
         })
       ),
     };
-  }
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-  try {
-    return JSON.parse(cleaned) as Record<string, unknown>;
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as Record<string, unknown>;
-      } catch {
-        // fallback: treat entire response as overview
-      }
-    }
-    return { overview: text };
   }
 }

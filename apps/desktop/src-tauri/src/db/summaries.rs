@@ -1,11 +1,7 @@
 use crate::db::models::Summary;
-use crate::db::AppState;
+use crate::db::{now_iso, AppState};
 use rusqlite::params;
 use tauri::State;
-
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339()
-}
 
 #[tauri::command]
 pub fn create_summary(

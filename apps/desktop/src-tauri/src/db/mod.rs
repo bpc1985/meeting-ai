@@ -7,6 +7,7 @@ pub mod settings;
 pub mod search;
 
 use crate::audio::recorder::RecordingState;
+use chrono::Utc;
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 use std::path::Path;
@@ -29,6 +30,10 @@ impl AppState {
             app_handle,
         }
     }
+}
+
+pub(crate) fn now_iso() -> String {
+    Utc::now().to_rfc3339()
 }
 
 pub fn init_db(app_data_dir: &Path) -> Result<Connection, Box<dyn std::error::Error>> {

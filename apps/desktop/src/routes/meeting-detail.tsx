@@ -7,6 +7,7 @@ import { useSummary, useTranscription } from "../hooks/use-summary";
 import { formatAsTxt, formatAsSrt } from "@meeting-ai/export";
 import type { TranscriptSegment } from "@meeting-ai/core";
 import type { MeetingSummary, RiskItem } from "@meeting-ai/llm";
+import { fmtDuration, fmtTimestamp } from "../lib/format";
 
 const SPEAKER_COLORS = ["bg-speaker-1/20 text-speaker-1", "bg-speaker-2/20 text-speaker-2", "bg-speaker-3/20 text-speaker-3", "bg-speaker-4/20 text-speaker-4"];
 
@@ -177,6 +178,3 @@ function SummaryContent({ tab, summary }: { tab: string; summary: MeetingSummary
   );
   return null;
 }
-
-function fmtDuration(secs: number) { const m = Math.floor(secs / 60); const s = Math.floor(secs % 60); return `${m}:${String(s).padStart(2, "0")}`; }
-function fmtTimestamp(secs: number) { const m = Math.floor(secs / 60); const s = Math.floor(secs % 60); return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`; }

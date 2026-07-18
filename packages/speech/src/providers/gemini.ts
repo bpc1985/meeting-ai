@@ -1,8 +1,10 @@
 import type { SpeechProvider, TranscriptResult } from "../types";
 import { withRetry } from "../retry";
+import { extractJson } from "../json";
+import { GEMINI_MODEL } from "@meeting-ai/core";
 
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export class GeminiSpeechProvider implements SpeechProvider {
   name = "gemini";
@@ -62,7 +64,7 @@ export class GeminiSpeechProvider implements SpeechProvider {
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const json = extractJson(text);
+    const json = extractJson<{ segments: Array<{ start: number; end: number; text: string }> }>(text);
 
     const segments = (json.segments ?? []).map(
       (s: { start: number; end: number; text: string }) => ({
@@ -77,20 +79,6 @@ export class GeminiSpeechProvider implements SpeechProvider {
     return { segments, duration };
   }
 }
-
-// ponytail: extract JSON even if Gemini wraps it in ```json fences
-function extractJson(text: string): { segments: Array<{ start: number; end: number; text: string }> } {
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    // fallback: try to find JSON object in the text
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    return { segments: [] };
-  }
-}
-
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const CHUNK_SIZE = 8192;

@@ -4,3 +4,4 @@ export type { SpeechProvider, TranscriptResult, TranscriptSegment } from "./type
 export { withRetry, HttpError } from "./retry";
 export { compressToMp3 } from "./compressor";
 export { transcribeWithChunking, findSilenceBoundaries } from "./chunker";
+export { extractJson } from "./json";

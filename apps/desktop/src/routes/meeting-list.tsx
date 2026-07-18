@@ -4,6 +4,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMeetings } from "../hooks/use-meetings";
 import { useMeetingStore } from "../stores/meeting-store";
+import { fmtDuration } from "../lib/format";
 
 export function MeetingListPage() {
   const { data: meetings, isLoading, refetch } = useMeetings();
@@ -146,10 +147,4 @@ function groupByDate(meetings: Array<{ created_at: string; id: string; title: st
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function fmtDuration(secs: number) {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
