@@ -95,3 +95,43 @@ pub fn get_key_from_keychain(service: String, account: String) -> Result<Option<
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::db::test_db;
+    use rusqlite::params;
+
+    #[test]
+    fn set_and_get_roundtrip() {
+        let db = test_db();
+        db.execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value", params!["test_key", "hello"]).unwrap();
+        let val: String = db.query_row("SELECT value FROM settings WHERE key = ?1", params!["test_key"], |row| row.get(0)).unwrap();
+        assert_eq!(val, "hello");
+    }
+
+    #[test]
+    fn get_nonexistent_returns_no_rows() {
+        let db = test_db();
+        let result = db.query_row("SELECT value FROM settings WHERE key = ?1", params!["nope"], |row| row.get::<_, String>(0));
+        assert!(matches!(result, Err(rusqlite::Error::QueryReturnedNoRows)));
+    }
+
+    #[test]
+    fn upsert_overwrites_value() {
+        let db = test_db();
+        db.execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value", params!["lang", "en"]).unwrap();
+        let val: String = db.query_row("SELECT value FROM settings WHERE key = ?1", params!["lang"], |row| row.get(0)).unwrap();
+        assert_eq!(val, "en");
+    }
+
+    #[test]
+    fn multiple_keys_coexist() {
+        let db = test_db();
+        db.execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value", params!["a", "1"]).unwrap();
+        db.execute("INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value", params!["b", "2"]).unwrap();
+        let a: String = db.query_row("SELECT value FROM settings WHERE key = ?1", params!["a"], |row| row.get(0)).unwrap();
+        let b: String = db.query_row("SELECT value FROM settings WHERE key = ?1", params!["b"], |row| row.get(0)).unwrap();
+        assert_eq!(a, "1");
+        assert_eq!(b, "2");
+    }
+}

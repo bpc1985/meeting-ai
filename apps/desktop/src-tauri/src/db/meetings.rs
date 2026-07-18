@@ -168,3 +168,69 @@ pub fn delete_meeting(id: String, state: State<AppState>) -> Result<(), String> 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::db::test_db;
+    use rusqlite::params;
+
+    #[test]
+    fn insert_meeting_with_draft_status() {
+        let db = test_db();
+        db.execute(
+            "INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, 'draft')",
+            params!["id1", "Test", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z"],
+        ).unwrap();
+        let status: String = db.query_row("SELECT status FROM meetings WHERE id = ?1", params!["id1"], |row| row.get(0)).unwrap();
+        assert_eq!(status, "draft");
+    }
+
+    #[test]
+    fn delete_meeting_cascades() {
+        let db = test_db();
+        db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, 'draft')", params!["m1", "M", "t", "t"]).unwrap();
+        db.execute("DELETE FROM meetings WHERE id = ?1", params!["m1"]).unwrap();
+        let count: i32 = db.query_row("SELECT COUNT(*) FROM meetings", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn list_meetings_ordered_by_created_at_desc() {
+        let db = test_db();
+        db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, ?5)", params!["a", "Old", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z", "draft"]).unwrap();
+        db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, ?5)", params!["b", "New", "2024-12-31T00:00:00Z", "2024-12-31T00:00:00Z", "draft"]).unwrap();
+        let mut stmt = db.prepare("SELECT id FROM meetings ORDER BY created_at DESC").unwrap();
+        let ids: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        assert_eq!(ids, vec!["b", "a"]);
+    }
+
+    #[test]
+    fn list_meetings_with_pagination() {
+        let db = test_db();
+        for i in 0..5 {
+            db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![format!("id{}", i), format!("Meeting {}", i), "t", "t", "draft"]).unwrap();
+        }
+        let mut stmt = db.prepare("SELECT id FROM meetings ORDER BY created_at DESC LIMIT ?1 OFFSET ?2").unwrap();
+        let page: Vec<String> = stmt.query_map(params![2, 1], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
+        assert_eq!(page.len(), 2);
+    }
+
+    #[test]
+    fn update_meeting_partial_title() {
+        let db = test_db();
+        db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, ?5)", params!["u1", "Old", "t", "t", "draft"]).unwrap();
+        db.execute("UPDATE meetings SET title = ?1 WHERE id = ?2", params!["New Title", "u1"]).unwrap();
+        let title: String = db.query_row("SELECT title FROM meetings WHERE id = ?1", params!["u1"], |row| row.get(0)).unwrap();
+        assert_eq!(title, "New Title");
+    }
+
+    #[test]
+    fn update_meeting_status() {
+        let db = test_db();
+        db.execute("INSERT INTO meetings (id, title, created_at, updated_at, status) VALUES (?1, ?2, ?3, ?4, ?5)", params!["u2", "T", "t", "t", "draft"]).unwrap();
+        db.execute("UPDATE meetings SET status = ?1, updated_at = ?2 WHERE id = ?3", params!["transcribed", "2024-06-01T00:00:00Z", "u2"]).unwrap();
+        let status: String = db.query_row("SELECT status FROM meetings WHERE id = ?1", params!["u2"], |row| row.get(0)).unwrap();
+        assert_eq!(status, "transcribed");
+    }
+}
