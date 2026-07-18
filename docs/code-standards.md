@@ -6,80 +6,113 @@ Implementation standards for Meeting AI. Covers structure, testing, security, an
 
 ```
 meeting-ai/
-├── apps/desktop/        # Tauri desktop app (React + Vite frontend, Rust backend in src-tauri)
-│   ├── src/             # React frontend (hooks, routes, components)
-│   ├── src-tauri/        # Rust backend (audio, db, speech integration)
-│   └── package.json      # Frontend scripts + vitest devDependency
-├── packages/speech/     # Shared transcription/chunking library (TS)
-└── docs/                # Design guidelines, wireframes, journals
+├── apps/desktop/          # Tauri desktop app (React + Vite frontend, Rust backend in src-tauri)
+│   ├── src/               # React frontend (hooks, routes, components, stores, lib)
+│   ├── src-tauri/          # Rust backend (audio, db) — 13 source files
+│   └── package.json        # scripts + vitest devDependency
+├── packages/               # Shared TypeScript packages (resolved via tsconfig paths)
+│   ├── core/src/           # Shared types (Meeting, TranscriptSegment) + GEMINI_MODEL constant
+│   ├── speech/src/         # STT providers, chunker, compressor, retry, extractJson
+│   ├── llm/src/            # LLM summarization (Gemini provider + prompt template)
+│   └── export/src/         # TXT + SRT formatters
+├── docs/                   # Design guidelines, wireframes, code standards, PDR, journals
+└── plans/                  # Implementation plans + reports
 ```
 
 ## Testing
 
-### Frontend / shared TS (`packages/speech`, `apps/desktop`)
+### Frontend + shared TS
 
-- Framework: **vitest** (devDependency in `apps/desktop/package.json`).
-- Run all TS tests:
-  ```bash
-  cd apps/desktop && npm test          # runs `vitest run`
-  ```
-- New unit tests live next to source as `*.test.ts` (e.g. `packages/speech/src/chunker.test.ts` covers `findSilenceBoundaries`).
-- Do not add a new test framework; vitest covers both `packages/speech` and `apps/desktop`.
+- Framework: **vitest** (`apps/desktop/package.json` devDependency).
+- Run: `cd apps/desktop && npm test`
+- Test files live next to source as `*.test.ts` (e.g. `packages/speech/src/chunker.test.ts`).
+- 4 tests for `findSilenceBoundaries` (no-silence, with-silence, tiny audio, undersized budget).
+- Do not add a new test framework.
 
-### Rust backend (`apps/desktop/src-tauri`)
+### Rust backend
 
 - Standard `cargo test` with `#[cfg(test)] mod tests` inline modules.
-- Run backend tests:
-  ```bash
-  cd apps/desktop/src-tauri && cargo test
-  ```
-- Example: `src/audio/recorder.rs` has 4 tests for `merge_wav_files` (single chunk, multi-chunk concat, empty input error, invalid WAV error).
+- Run: `cd apps/desktop/src-tauri && cargo test`
+- 4 tests for `merge_wav_files` (single chunk, multi-chunk concat, empty input error, invalid WAV error).
+- Tests use `hound` (already a dependency) + `std::env::temp_dir()` for temp files.
 
 ### Conventions
 
-- Tests are co-located with the code they exercise (inline Rust modules; `*.test.ts` for TS).
+- Tests co-located with code (inline Rust modules; `*.test.ts` for TS).
 - Prefer real fixtures over mocks for audio/WAV logic.
 
 ## Security
 
 ### API Key Storage — macOS Keychain
 
-API keys (e.g. Gemini) are **not** stored in plaintext settings. They are written to the macOS keychain via the `security` CLI:
+API keys stored in macOS keychain via `security` CLI, not plaintext in SQLite:
 
-- `store_key_in_keychain(service, account, key)` — `security add-generic-password -s <service> -a <account> -w <key> -U` (the `-U` flag updates existing entries; on conflict it deletes + retries).
-- `get_key_from_keychain(service, account)` — `security find-generic-password -s <service> -a <account> -w`; returns `None` if the entry is absent.
+- `store_key_in_keychain(service, account, key)` — `security add-generic-password -s <service> -a <account> -w <key> -U`
+- `get_key_from_keychain(service, account)` — `security find-generic-password -s <service> -a <account> -w`
 
-Both are exposed as Tauri commands (`#[tauri::command]`) in `src-tauri/src/db/settings.rs` and registered in `lib.rs`. macOS only — there is no fallback for other platforms.
+Both are Tauri commands in `src-tauri/src/db/settings.rs`, registered in `lib.rs`. DB stores only `keychain:` marker (e.g. `keychain:openai_api_key`). Backward compat: plaintext values without `keychain:` prefix still load normally.
 
 ### Gemini Authentication
 
-Gemini speech requests authenticate via the `x-goog-api-key` header (see `packages/speech/src/providers/gemini.ts`), not a query param. The key is pulled from the keychain.
+All Gemini requests authenticate via `x-goog-api-key` header (not URL query param). Applies to both speech (`packages/speech/src/providers/gemini.ts`) and LLM (`packages/llm/src/providers/gemini.ts`). MIME type auto-detected from file extension (webm→audio/webm, wav→audio/wav).
 
 ### Content Security Policy
 
-CSP is enforced via `tauri.conf.json` (`app.security.csp`):
+CSP enforced via `tauri.conf.json` (`app.security.csp`):
 
 ```
 default-src 'self';
-style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-font-src 'self' https://fonts.gstatic.com;
+style-src 'self' 'unsafe-inline';
+font-src 'self';
 connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://generativelanguage.googleapis.com
 ```
 
-Allowed external hosts: OpenAI (Whisper) and Google Generative Language (Gemini). `connect-src` must be updated if a new API host is added.
+Fonts are local (no CDN). `connect-src` must be updated if a new API host is added.
 
 ## Error Handling
 
-- Rust commands return `Result<T, String>`; surface errors to the frontend as string messages.
-- Derive `serde::Serialize` on any struct returned to the frontend (e.g. `SearchResult` in `src/db/models.rs`, `StopResult` in `recorder.rs`).
-- Frontend catches command failures with an `ErrorBoundary` (`apps/desktop/src/components/error-boundary.tsx` wrapping the app in `App.tsx`).
+- Rust commands return `Result<T, String>`; surface errors as string messages.
+- cpal stream errors emit Tauri `recording-error` events → frontend shows dismissable red banner.
+- LLM summarization uses `withRetry` (exponential backoff: 429, 5xx, TypeError).
+- `ErrorBoundary` component wraps the app in `App.tsx`, logs errors via `componentDidCatch`.
+- Derive `serde::Serialize` on any struct returned to the frontend.
 
-## Serialization Rule
+## Shared Utilities
 
-Any struct passed across the Tauri IPC boundary (command return types, DB models) must derive `serde::Serialize` (and `Deserialize` for command arguments). Missing derives cause silent serialization failures.
+Before adding new code, check existing shared utilities:
+
+| Utility | Location | Used by |
+|---------|----------|---------|
+| `extractJson<T>` | `packages/speech/src/json.ts` | LLM Gemini provider, speech Gemini provider |
+| `withRetry` + `HttpError` | `packages/speech/src/retry.ts` | All API calls (speech + LLM) |
+| `GEMINI_MODEL` | `packages/core/src/constants.ts` | Both Gemini providers (single source for model name) |
+| `fmtDuration` + `fmtTimestamp` | `apps/desktop/src/lib/format.ts` | meeting-list, meeting-detail routes |
+| `now_iso()` | `src-tauri/src/db/mod.rs` (pub(crate)) | meetings.rs, summaries.rs |
+| `useKeyboardShortcuts` | `apps/desktop/src/hooks/use-keyboard-shortcuts.ts` | Route-level keyboard shortcut registration |
+
+## DB Patterns
+
+- **Batch INSERT**: `create_segments_batch` wraps all inserts in `BEGIN`/`COMMIT` transaction with explicit `ROLLBACK` on error.
+- **Batch UPDATE**: `update_segment` builds dynamic SQL with `Box<dyn ToSql>` values — single UPDATE regardless of how many fields change.
+- **Pagination**: `list_meetings` accepts `offset`/`limit` params with `LIMIT ? OFFSET ?` SQL.
+- **Upsert**: `set_setting` uses `ON CONFLICT(key) DO UPDATE SET value = excluded.value`.
+- **FTS5**: `search_meetings` uses `segments_fts MATCH` with prefix matching and `snippet()` for highlighted results.
+
+## Frontend Patterns
+
+- **State management**: Zustand for client state (meetingStore, settingsStore), TanStack Query for server state (staleTime: 30s, retry: 1).
+- **Settings load**: API keys fetched from keychain, non-key settings from DB. Backward compat for plaintext values.
+- **Settings save**: API keys → keychain + DB marker on blur (not on every keystroke).
+- **Audio playback**: Read file via Tauri FS plugin, create blob URL, play via `<audio>` element.
+- **Export**: Native macOS save dialog via `@tauri-apps/plugin-dialog` (not hidden DOM link).
+- **Keyboard shortcuts**: Suppressed when user is typing in input/textarea (`useKeyboardShortcuts` hook).
+- **Undo for edits**: `Escape` key in `EditableText` textarea reverts to original value.
+- **Fonts**: Local TTF files in `assets/fonts/` (Lexend + Atkinson Hyperlegible), `@font-face` in `globals.css`.
 
 ## Contribution Conventions
 
-- Keep commits focused; conventional commit format; no AI references in messages.
-- Do not commit secrets, `.env`, or keychain material.
-- Reuse existing helpers/utilities before adding new ones (YAGNI/KISS/DRY).
+- Conventional commits, no AI references in messages.
+- No secrets, `.env`, or keychain material in commits.
+- Kebab-case for JS/TS files, snake_case for Rust files.
+- `// ponytail:` comments mark deliberate simplifications with upgrade paths.
+- Reuse existing helpers before adding new ones.
