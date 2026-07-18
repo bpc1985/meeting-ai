@@ -22,6 +22,7 @@ pub struct RecordingState {
     pub start_time: Option<std::time::Instant>,
     pub paused_duration: std::time::Duration,
     pub stream: SendStream,
+    pub active_writer: bool,
 }
 
 impl Default for RecordingState {
@@ -34,6 +35,7 @@ impl Default for RecordingState {
             start_time: None,
             paused_duration: std::time::Duration::ZERO,
             stream: SendStream(None),
+            active_writer: false,
         }
     }
 }
@@ -115,6 +117,7 @@ pub fn start_recording(state: State<AppState>) -> Result<String, String> {
     rec.is_paused = false;
     rec.active_path = Some(file_path.clone());
     rec.chunk_paths = vec![file_path.clone()];
+    rec.active_writer = true;
     rec.start_time = Some(std::time::Instant::now());
     rec.paused_duration = std::time::Duration::ZERO;
     rec.stream.0 = Some(stream);
@@ -141,6 +144,7 @@ pub fn pause_recording(state: State<AppState>) -> Result<(), String> {
     }
     rec.start_time = None;
     rec.is_paused = true;
+    rec.active_writer = false;
     Ok(())
 }
 
