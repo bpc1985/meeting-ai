@@ -30,7 +30,8 @@ export function SettingsPage() {
           <label className="block text-sm font-medium text-text-primary mb-2">OpenAI API Key</label>
           <div className="relative">
             <input type={showOpenAi ? "text" : "password"} value={openaiApiKey}
-              onChange={(e) => { setApiKey("openai", e.target.value); saveSetting.mutate({ key: "openai_api_key", value: e.target.value }); }}
+              onChange={(e) => setApiKey("openai", e.target.value)}
+              onBlur={() => saveSetting.mutate({ key: "openai_api_key", value: openaiApiKey })}
               placeholder="sk-..." className="w-full bg-bg-elevated border border-border-default rounded-md px-3 py-2 pr-10 text-sm text-text-primary placeholder:text-text-tertiary focus:border-border-focus outline-none" />
             <button onClick={() => setShowOpenAi(!showOpenAi)} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
               {showOpenAi ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -41,7 +42,8 @@ export function SettingsPage() {
           <label className="block text-sm font-medium text-text-primary mb-2">Gemini API Key</label>
           <div className="relative">
             <input type={showGemini ? "text" : "password"} value={geminiApiKey}
-              onChange={(e) => { setApiKey("gemini", e.target.value); saveSetting.mutate({ key: "gemini_api_key", value: e.target.value }); }}
+              onChange={(e) => setApiKey("gemini", e.target.value)}
+              onBlur={() => saveSetting.mutate({ key: "gemini_api_key", value: geminiApiKey })}
               placeholder="AIza..." className="w-full bg-bg-elevated border border-border-default rounded-md px-3 py-2 pr-10 text-sm text-text-primary placeholder:text-text-tertiary focus:border-border-focus outline-none" />
             <button onClick={() => setShowGemini(!showGemini)} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
               {showGemini ? <EyeOff size={16} /> : <Eye size={16} />}

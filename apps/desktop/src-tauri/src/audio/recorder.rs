@@ -270,8 +270,6 @@ fn merge_wav_files(chunks: &[PathBuf], output: &PathBuf) -> Result<(), String> {
         return Err("No chunks to merge".into());
     }
 
-    let mut output_file = File::create(output).map_err(|e| e.to_string())?;
-
     let mut first = true;
     let mut wav_header = Vec::new();
     let mut data_size: u32 = 0;
@@ -287,16 +285,11 @@ fn merge_wav_files(chunks: &[PathBuf], output: &PathBuf) -> Result<(), String> {
 
         // WAV header is 44 bytes; data starts at byte 44
         if first {
-            // Write header from first chunk (with placeholder data size)
             wav_header = all_bytes[..44].to_vec();
             first = false;
         }
 
-        // Write audio data (skip 44-byte header)
         let audio_data = &all_bytes[44..];
-        output_file
-            .write_all(audio_data)
-            .map_err(|e| e.to_string())?;
         data_size += audio_data.len() as u32;
     }
 
@@ -329,4 +322,105 @@ fn merge_wav_files(chunks: &[PathBuf], output: &PathBuf) -> Result<(), String> {
 pub struct StopResult {
     pub file_path: String,
     pub duration_secs: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hound::{SampleFormat, WavSpec, WavReader, WavWriter};
+    use std::env;
+
+    fn make_test_wav(path: &PathBuf, samples: &[i16]) {
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: 44100,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let mut writer = WavWriter::create(path, spec).unwrap();
+        for &s in samples {
+            writer.write_sample(s).unwrap();
+        }
+        writer.finalize().unwrap();
+    }
+
+    #[test]
+    fn test_merge_single_chunk_preserves_samples() {
+        let dir = env::temp_dir().join(format!("meeting-ai-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let chunk_path = dir.join("chunk.wav");
+        let expected: Vec<i16> = (0..1000).map(|i| (i % 256) as i16).collect();
+        make_test_wav(&chunk_path, &expected);
+
+        let output_path = dir.join("merged.wav");
+        merge_wav_files(&[chunk_path], &output_path).unwrap();
+
+        let mut reader = WavReader::open(&output_path).unwrap();
+        let read_samples: Vec<i16> = reader.samples::<i16>().map(|s| s.unwrap()).collect();
+        assert_eq!(read_samples.len(), expected.len());
+        assert_eq!(read_samples, expected);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_merge_multiple_chunks_concatenates() {
+        let dir = env::temp_dir().join(format!("meeting-ai-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let chunk1_path = dir.join("chunk1.wav");
+        let chunk2_path = dir.join("chunk2.wav");
+        let samples1: Vec<i16> = vec![100; 500];
+        let samples2: Vec<i16> = vec![-100; 300];
+        make_test_wav(&chunk1_path, &samples1);
+        make_test_wav(&chunk2_path, &samples2);
+
+        let output_path = dir.join("merged.wav");
+        merge_wav_files(&[chunk1_path, chunk2_path], &output_path).unwrap();
+
+        let mut reader = WavReader::open(&output_path).unwrap();
+        let read_samples: Vec<i16> = reader.samples::<i16>().map(|s| s.unwrap()).collect();
+        assert_eq!(read_samples.len(), 800);
+
+        // First 500 samples should be from chunk1 (value 100)
+        for s in &read_samples[..500] {
+            assert_eq!(*s, 100);
+        }
+        // Last 300 from chunk2 (value -100)
+        for s in &read_samples[500..] {
+            assert_eq!(*s, -100);
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_merge_empty_chunks_returns_error() {
+        let dir = env::temp_dir().join(format!("meeting-ai-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let output_path = dir.join("empty.wav");
+
+        let result = merge_wav_files(&[], &output_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No chunks"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_merge_invalid_wav_returns_error() {
+        let dir = env::temp_dir().join(format!("meeting-ai-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let bad_path = dir.join("bad.wav");
+        std::fs::write(&bad_path, b"not a wav file").unwrap();
+        let output_path = dir.join("merged.wav");
+
+        let result = merge_wav_files(&[bad_path], &output_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too small"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

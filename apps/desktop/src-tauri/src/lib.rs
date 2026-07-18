@@ -43,6 +43,8 @@ pub fn run() {
             // settings
             db::settings::get_setting,
             db::settings::set_setting,
+            db::settings::store_key_in_keychain,
+            db::settings::get_key_from_keychain,
             // search
             db::search::search_meetings,
             // audio recording

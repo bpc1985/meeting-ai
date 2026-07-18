@@ -153,7 +153,7 @@ pub fn delete_meeting(id: String, state: State<AppState>) -> Result<(), String> 
         // ponytail: pattern match for leftover chunks too
         if let Some(parent) = std::path::Path::new(&path).parent() {
             if let Some(stem) = std::path::Path::new(&path).file_stem() {
-                let pattern = parent.join(format!("{}*", stem.to_string_lossy()));
+                let _pattern = parent.join(format!("{}*", stem.to_string_lossy()));
                 if let Ok(entries) = std::fs::read_dir(parent) {
                     for entry in entries.flatten() {
                         let name = entry.file_name();

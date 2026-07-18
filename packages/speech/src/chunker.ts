@@ -69,7 +69,7 @@ export async function transcribeWithChunking(
  * ponytail: RMS in 100ms windows, split at longest silence region
  * that keeps each chunk under the byte budget.
  */
-function findSilenceBoundaries(
+export function findSilenceBoundaries(
   buffer: AudioBuffer,
   maxBytes: number,
   totalBytes: number

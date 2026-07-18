@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GeminiProvider } from "@meeting-ai/llm";
-import { WhisperProvider, GeminiSpeechProvider } from "@meeting-ai/speech";
+import { WhisperProvider, GeminiSpeechProvider, transcribeWithChunking } from "@meeting-ai/speech";
 import { useSettingsStore } from "../stores/settings-store";
 import type { TranscriptSegment } from "@meeting-ai/core";
 
@@ -69,9 +70,12 @@ export function useSummary(meetingId: string | undefined) {
 export function useTranscription() {
   const settings = useSettingsStore();
   const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (meetingId: string) => {
+      setProgress(null);
+
       // Get meeting to find audio path
       const meeting = await invoke<{ id: string; audio_path: string | null }>("get_meeting", {
         id: meetingId,
@@ -90,8 +94,13 @@ export function useTranscription() {
 
       if (!apiKey) throw new Error("No API key configured");
 
-      // Transcribe
-      const result = await provider.transcribe(meeting.audio_path, apiKey);
+      // Transcribe with automatic chunking for large files
+      const result = await transcribeWithChunking(
+        meeting.audio_path,
+        provider,
+        apiKey,
+        (current, total) => setProgress({ current, total })
+      );
 
       // Save segments
       const segments = result.segments.map((s, i) => ({
@@ -114,4 +123,6 @@ export function useTranscription() {
       queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
     },
   });
+
+  return { ...mutation, progress };
 }

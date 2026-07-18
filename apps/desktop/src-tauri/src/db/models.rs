@@ -35,6 +35,7 @@ pub struct Summary {
     pub created_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResult {
     pub id: String,
     pub title: String,

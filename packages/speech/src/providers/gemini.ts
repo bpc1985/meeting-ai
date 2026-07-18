@@ -18,17 +18,25 @@ export class GeminiSpeechProvider implements SpeechProvider {
     // ponytail: browser doesn't have Buffer, use btoa with Uint8Array
     const base64 = arrayBufferToBase64(audioBytes.buffer as ArrayBuffer);
 
+    // Detect MIME type from file extension — compressor produces .webm, chunker produces .wav
+    const extension = audioPath.split(".").pop()?.toLowerCase();
+    const mimeType = extension === "webm" ? "audio/webm"
+      : extension === "wav" ? "audio/wav"
+      : extension === "m4a" ? "audio/mp4"
+      : extension === "ogg" ? "audio/ogg"
+      : "audio/mpeg";
+
     const response = await withRetry(() =>
-      fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      fetch(GEMINI_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [
             {
               parts: [
                 {
                   inlineData: {
-                    mimeType: "audio/mp3",
+                    mimeType,
                     data: base64,
                   },
                 },

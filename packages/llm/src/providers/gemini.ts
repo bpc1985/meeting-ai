@@ -19,9 +19,9 @@ export class GeminiProvider implements LLMProvider {
   async summarize(transcript: string, apiKey: string): Promise<MeetingSummary> {
     const prompt = MEETING_SUMMARY_PROMPT.replace("{transcript}", transcript);
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    const response = await fetch(GEMINI_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
