@@ -43,6 +43,7 @@ export default defineConfig(async () => ({
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "../../packages/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "../../packages/**/*.test.ts"],
+    setup: ["src/test-setup.ts"],
   },
 }));
