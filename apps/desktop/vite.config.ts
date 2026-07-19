@@ -40,6 +40,17 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  optimizeDeps: {
+    exclude: [
+      "@tauri-apps/api",
+      "@tauri-apps/api/core",
+      "@tauri-apps/api/path",
+      "@tauri-apps/api/event",
+      "@tauri-apps/plugin-fs",
+      "@tauri-apps/plugin-shell",
+      "@tauri-apps/plugin-dialog",
+    ],
+  },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   test: {
     environment: "node",
