@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import { Mic, Search } from "lucide-react";
+import { Mic, Search, Upload } from "lucide-react";
 import { useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useMeetings } from "../hooks/use-meetings";
 import { useMeetingStore } from "../stores/meeting-store";
 import { fmtDuration } from "../lib/format";
@@ -13,6 +14,7 @@ export function MeetingListPage() {
   const setSearchQuery = useMeetingStore((s) => s.setSearchQuery);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const handleNewRecording = async () => {
@@ -22,6 +24,30 @@ export function MeetingListPage() {
         title: `Meeting — ${new Date().toLocaleDateString()}`,
       });
       navigate(`/recording/${meeting.id}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleImportAudio = async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "Audio", extensions: ["wav", "mp3", "m4a", "aac", "ogg", "flac", "webm"] }],
+    });
+    if (!selected) return;
+
+    setCreating(true);
+    try {
+      const filePath = typeof selected === "string" ? selected : selected.path;
+      const fileName = filePath.split("/").pop() ?? filePath;
+      const meeting = await invoke<{ id: string }>("create_meeting", {
+        title: `Imported — ${fileName}`,
+      });
+      const copiedPath = await invoke<string>("import_audio", { sourcePath: filePath });
+      await invoke("update_meeting", { id: meeting.id, audioPath: copiedPath });
+      navigate(`/meeting/${meeting.id}`);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err));
     } finally {
       setCreating(false);
     }
@@ -48,15 +74,36 @@ export function MeetingListPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Meetings</h1>
-        <button
-          onClick={handleNewRecording}
-          disabled={creating}
-          className="flex items-center gap-2 px-4 py-2.5 bg-accent text-bg-deep font-semibold rounded-md text-sm hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 transition-all"
-        >
-          <Mic size={18} />
-          {creating ? "Creating..." : "New Recording"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImportAudio}
+            disabled={creating}
+            className="flex items-center gap-2 px-4 py-2.5 bg-bg-elevated border border-border-default text-text-secondary font-medium rounded-md text-sm hover:bg-bg-hover hover:text-text-primary active:scale-[0.98] disabled:opacity-50 transition-all"
+          >
+            <Upload size={16} />
+            {creating ? "Importing..." : "Import Audio"}
+          </button>
+          <button
+            onClick={handleNewRecording}
+            disabled={creating}
+            className="flex items-center gap-2 px-4 py-2.5 bg-accent text-bg-deep font-semibold rounded-md text-sm hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 transition-all"
+          >
+            <Mic size={18} />
+            {creating ? "Creating..." : "New Recording"}
+          </button>
+        </div>
       </div>
+
+      {importError && (
+        <div className="flex items-center gap-3 bg-error-muted border border-error/20 text-error rounded-lg px-4 py-3 mb-6 text-sm">
+          <span>Import failed: {importError}</span>
+          <button onClick={() => setImportError(null)} className="ml-auto text-error/60 hover:text-error">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       <div className="mb-6">
         <div className="relative max-w-md">
@@ -85,13 +132,22 @@ export function MeetingListPage() {
         <div className="bg-bg-elevated rounded-lg p-12 text-center border border-border-default">
           <Mic size={48} className="mx-auto text-text-tertiary mb-4" />
           <p className="text-text-secondary text-lg mb-2">No meetings yet</p>
-          <p className="text-text-tertiary mb-4">Record your first meeting to get started</p>
-          <button
-            onClick={handleNewRecording}
-            className="px-4 py-2.5 bg-accent text-bg-deep font-semibold rounded-md text-sm hover:bg-accent-hover active:scale-[0.98] transition-all"
-          >
-            Start Recording
-          </button>
+          <p className="text-text-tertiary mb-4">Record your first meeting or import an audio file</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={handleImportAudio}
+              className="px-4 py-2.5 bg-bg-elevated border border-border-default text-text-secondary font-medium rounded-md text-sm hover:bg-bg-hover hover:text-text-primary transition-all"
+            >
+              <Upload size={14} className="inline mr-1.5" />
+              Import Audio
+            </button>
+            <button
+              onClick={handleNewRecording}
+              className="px-4 py-2.5 bg-accent text-bg-deep font-semibold rounded-md text-sm hover:bg-accent-hover active:scale-[0.98] transition-all"
+            >
+              Start Recording
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
