@@ -9,7 +9,6 @@ pub mod search;
 use crate::audio::recorder::RecordingState;
 use chrono::Utc;
 use rusqlite::Connection;
-use rusqlite_migration::Migrations;
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::AppHandle;
