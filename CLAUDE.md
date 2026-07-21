@@ -76,18 +76,34 @@ packages/                      # Shared TypeScript packages (resolved via tsconf
 **TypeScript:**
 - All Tauri commands invoked via `invoke<T>(cmd, args)` from `@tauri-apps/api/core`
 - Zustand stores for client state, TanStack Query for server state (staleTime: 30s, retry: 1)
+- Settings loaded on app startup via `useLoadSettings()` in `AppShell` — API keys fetched from keychain before any page renders
 - Settings load: detect `keychain:` marker → fetch from keychain, backward compat for plaintext
 - Settings save: API keys go to keychain via `store_key_in_keychain`, DB gets `keychain:` marker
 - CSS: Tailwind v4 via `@tailwindcss/vite`, design tokens in `globals.css` `@theme` block
 - Fonts: local TTF files in `assets/fonts/` (Lexend + Atkinson Hyperlegible), `@font-face` in globals.css
+- Playback: `readFile` via Tauri FS → `Blob` with extension-derived MIME → `URL.createObjectURL` → `<audio>` element
+
+**Tauri FS permissions (`capabilities/default.json`):**
+- `fs:default` + `fs:allow-stat` + `fs:allow-create` + `fs:allow-read-file` + `fs:allow-write-file`
+- Scoped: `fs:scope-document-recursive` (audio dir), `fs:scope-appcache-recursive` (compressed files), `fs:scope-appdata-recursive` (DB), `fs:scope-temp-recursive` (chunks)
+
+**Transcription overlay (`meeting-detail.tsx`):**
+- 3 phases: "Preparing audio…" (compression) → "Sending to API…" (single-shot) / "Chunk N/M (X%)" (chunked)
+- Centered overlay with `backdrop-blur-sm` blocks all interactions during transcription
 
 **Audio pipeline:**
 1. `start_recording` → cpal captures mic → hound writes WAV chunks
 2. On stop → `merge_wav_files` concatenates chunks, writes final WAV with correct header
-3. Frontend `useTranscription` → `transcribeWithChunking` → `compressAudio` (WebM Opus via MediaRecorder) → provider-specific API call
-4. Whisper: FormData POST to `/v1/audio/transcriptions` with `verbose_json` + segment timestamps
-5. Gemini: `generateContent` with `inlineData` (base64), `x-goog-api-key` header auth
-6. Chunker: RMS silence detection in 100ms windows → split at silence gaps → transcribe chunks in parallel
+3. Import (`import.rs`): 7 formats (WAV, MP3, M4A, AAC, OGG, FLAC, WebM) — copied to `~/Documents/meeting-ai/audio/`, symlinks rejected, orphan cleanup on DB failure
+4. Frontend `useTranscription` → `transcribeWithChunking` → `compressAudio` → provider-specific API call
+   - WAV/FLAC: decoded + re-encoded to WebM Opus via MediaRecorder (64kbps mono)
+   - MP3/M4A/AAC/OGG/WebM: pass through as-is (no re-encode)
+   - Returns `{ path: string; size: number }` — size used for chunk decision
+5. Whisper: FormData POST to `/v1/audio/transcriptions` with `verbose_json` + segment timestamps
+6. Gemini: `generateContent` with `inlineData` (base64), `x-goog-api-key` header auth
+7. Chunker: RMS silence detection in 100ms windows → split at silence gaps → transcribe chunks in parallel
+   - Single-shot (< ~50 min): `onProgress(1, 1)` called once — overlay shows "Sending to API…"
+   - Chunked: `onProgress(N, total)` per chunk — overlay shows "Chunk N/M (X%)" with progress bar
 
 **DB schema (6 tables):** meetings, segments, segments_fts (FTS5 virtual), summaries, settings. FTS triggers on INSERT/DELETE/UPDATE for segments_fts.
 
