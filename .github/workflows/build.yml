@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos
+            runs-on: macos-latest
+            args: --target aarch64-apple-darwin
+          - target: macos-intel
+            runs-on: macos-latest
+            args: --target x86_64-apple-darwin
+          - target: windows
+            runs-on: windows-latest
+            args: --target x86_64-pc-windows-msvc
+          - target: linux
+            runs-on: ubuntu-latest
+            args: --target x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Linux deps
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: apps/desktop
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          args: ${{ matrix.args }}
+          tagName: v__VERSION__
+          releaseName: "Meeting AI v__VERSION__"
+          prerelease: false
