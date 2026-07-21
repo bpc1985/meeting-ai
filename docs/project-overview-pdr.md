@@ -2,7 +2,7 @@
 
 ## Overview
 
-Meeting AI is a macOS desktop application (Tauri v2 + React 19 + Rust) that records meetings, transcribes via OpenAI Whisper or Gemini, generates AI summaries, and lets users edit/export transcripts. All data stored locally in SQLite. Privacy-first — no cloud sync, API keys in macOS keychain.
+Meeting AI is a desktop application (Tauri v2 + React 19 + Rust) that records meetings, transcribes via OpenAI Whisper or Gemini, generates AI summaries, and lets users edit/export transcripts. All data stored locally in SQLite. Privacy-first — no cloud sync, API keys in platform keychain. CI builds for macOS, Windows, and Linux.
 
 ## Goals
 
@@ -16,7 +16,8 @@ Meeting AI is a macOS desktop application (Tauri v2 + React 19 + Rust) that reco
 
 ## Non-Goals (current scope)
 
-- Cross-platform support beyond macOS (keychain is macOS-only).
+- Keychain abstraction for non-macOS platforms (macOS `security` CLI only — Windows/Linux builds exist but key storage falls back to DB).
+- Cross-compilation from a single host (build per-platform via CI).
 - Real-time streaming transcription (record-then-transcribe flow).
 - System audio capture (mic only).
 - Speaker diarization.
@@ -69,15 +70,17 @@ packages/export           TXT + SRT formatters
 
 ## Acceptance Criteria (Sprint 1-6)
 
-- `cargo test` — 4/4 merge_wav_files tests pass.
-- `npm test` (vitest) — 4/4 findSilenceBoundaries tests pass.
+- `cargo test` — Rust tests pass.
+- `npm test` (vitest) — frontend tests pass.
 - `cargo build` + `npm run build` — both pass.
+- CI passes on push/PR (Rust tests + frontend tests + lint + build).
 - Settings API key inputs persist to keychain on blur.
 - App boots under CSP without console violations.
 - Recording errors surface as dismissable red banner.
 - "Start Recording" button required before mic activates.
 - Keyboard shortcuts work (suppressed when typing).
 - Pagination "Load More" button appears when >50 meetings.
+- Release builds produce platform bundles via GitHub Actions on version tags.
 
 ## Dependencies
 

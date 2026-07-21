@@ -1,6 +1,8 @@
 # Meeting AI
 
-Privacy-first desktop meeting transcription app for macOS. Record mic audio, transcribe via OpenAI Whisper or Gemini, edit transcripts, generate AI summaries, export to TXT/SRT. All data stored locally in SQLite.
+Privacy-first desktop meeting transcription app. Record mic audio, transcribe via OpenAI Whisper or Gemini, edit transcripts, generate AI summaries, export to TXT/SRT. All data stored locally in SQLite.
+
+macOS | Windows | Linux
 
 ## Features
 
@@ -15,9 +17,11 @@ Privacy-first desktop meeting transcription app for macOS. Record mic audio, tra
 
 ## Prerequisites
 
-- macOS (keychain dependency)
 - Node.js 18+ and npm
 - Rust toolchain (`rustup`)
+- **macOS:** Xcode Command Line Tools
+- **Windows:** Microsoft Visual Studio C++ Build Tools
+- **Linux:** `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libasound2-dev`
 
 ## Quick Start
 
@@ -50,7 +54,21 @@ cargo build --release    # Production binary
 
 # Full Tauri app
 npx tauri dev            # Dev with hot reload
-npx tauri build          # Production .app/.dmg bundle
+npx tauri build          # Production bundle (.dmg/.msi/.AppImage)
+```
+
+## Releasing
+
+Builds run via GitHub Actions on every version tag. Produces `.dmg` (macOS), `.msi`/`.exe` (Windows), `.AppImage`/`.deb` (Linux).
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+To trigger manually: **Actions → Build → Run workflow**.
+
+CI runs on push/PR: Rust tests + frontend tests + lint + build.
 ```
 
 ## Architecture
@@ -83,7 +101,7 @@ packages/                      # Shared TypeScript packages
 | State | Zustand, TanStack Query |
 | Backend | Rust (cpal, hound, rusqlite, chrono) |
 | Database | SQLite with WAL + FTS5 |
-| Security | macOS keychain (`security` CLI), CSP |
+| Security | Platform keychain (macOS `security` CLI), CSP |
 | Testing | vitest (frontend), cargo test (Rust) |
 | Linting | oxlint |
 
