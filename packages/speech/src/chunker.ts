@@ -18,6 +18,7 @@ export async function transcribeWithChunking(
   const { path: compressedPath, size: compressedSize } = await compressAudio(audioPath);
 
   if (compressedSize <= MAX_CHUNK_BYTES) {
+    onProgress?.(1, 1);
     return provider.transcribe(compressedPath, apiKey);
   }
 

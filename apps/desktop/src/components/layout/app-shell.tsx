@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { FileText, Settings, Shield } from "lucide-react";
+import { useLoadSettings } from "../../hooks/use-settings";
 
 function Sidebar() {
   return (
@@ -52,6 +53,8 @@ function Sidebar() {
 }
 
 export function AppShell() {
+  useLoadSettings();
+
   return (
     <div className="flex h-screen">
       <Sidebar />

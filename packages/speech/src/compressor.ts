@@ -1,9 +1,11 @@
-import { readFile, writeFile, mkdir } from "@tauri-apps/plugin-fs";
+import { readFile, writeFile, mkdir, stat } from "@tauri-apps/plugin-fs";
 import { appCacheDir, join } from "@tauri-apps/api/path";
 
+const COMPRESSED_EXTS = new Set(["mp3", "m4a", "aac", "ogg", "webm"]);
+
 /**
- * Compress WAV to compressed audio (WebM Opus 64kbps mono) before upload.
- * Uses browser AudioContext + MediaRecorder — no native deps.
+ * Compress WAV/FLAC to WebM Opus 64kbps mono before upload.
+ * Already-compressed formats (MP3, M4A, AAC, OGG, WebM) pass through as-is.
  *
  * 10MB/min WAV → ~0.5MB/min compressed. 50 min fits in 25MB Whisper limit.
  *
@@ -11,6 +13,14 @@ import { appCacheDir, join } from "@tauri-apps/api/path";
  * Whisper and Gemini both accept WebM natively, so this works for both providers.
  */
 export async function compressAudio(wavPath: string): Promise<{ path: string; size: number }> {
+  const ext = wavPath.split(".").pop()?.toLowerCase() ?? "";
+
+  // Already compressed — skip decode+re-encode, pass through
+  if (COMPRESSED_EXTS.has(ext)) {
+    const { size } = await stat(wavPath);
+    return { path: wavPath, size };
+  }
+
   const audioBytes = await readFile(wavPath);
   const audioCtx = new AudioContext();
   const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer as ArrayBuffer);

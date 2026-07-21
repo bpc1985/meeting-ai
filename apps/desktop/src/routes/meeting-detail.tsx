@@ -56,8 +56,42 @@ export function MeetingDetailPage() {
     risks: (() => { try { return JSON.parse(dbSummary.risks ?? "[]") as RiskItem[]; } catch { return []; } })(),
   } : null;
 
+  const progressPercent = transcribe.progress
+    ? Math.round((transcribe.progress.current / transcribe.progress.total) * 100)
+    : 0;
+  const isSingleShot = transcribe.progress && transcribe.progress.total === 1;
+  const isChunked = transcribe.progress && transcribe.progress.total > 1;
+
   return (
-    <div className="flex h-full">
+    <div className="flex h-full relative">
+      {/* Transcription Overlay */}
+      {transcribing && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-bg-deep/80 backdrop-blur-sm">
+          <Loader2 size={40} className="animate-spin text-accent mb-4" />
+          <p className="text-lg font-semibold text-text-primary mb-1">Transcribing…</p>
+          {isSingleShot ? (
+            <p className="text-sm text-text-secondary mb-3">Sending to API…</p>
+          ) : isChunked ? (
+            <p className="text-sm text-text-secondary mb-3">
+              Chunk {transcribe.progress.current} / {transcribe.progress.total} ({progressPercent}%)
+            </p>
+          ) : (
+            <p className="text-sm text-text-secondary mb-3">Preparing audio…</p>
+          )}
+          <div className="w-48 h-2 bg-bg-tertiary rounded-full overflow-hidden">
+            {isChunked ? (
+              <div
+                className="h-full bg-accent transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            ) : isSingleShot ? (
+              <div className="h-full bg-accent animate-pulse" style={{ width: "100%" }} />
+            ) : (
+              <div className="h-full bg-accent animate-pulse" style={{ width: "60%" }} />
+            )}
+          </div>
+        </div>
+      )}
       {/* Transcript Panel */}
       <div className="flex-1 overflow-y-auto flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border-default">
@@ -80,7 +114,13 @@ export function MeetingDetailPage() {
                     // ponytail: read via Tauri fs, create blob URL for playback
                     const { readFile } = await import("@tauri-apps/plugin-fs");
                     const bytes = await readFile(meeting.audio_path);
-                    const blob = new Blob([bytes], { type: "audio/wav" });
+                    const ext = meeting.audio_path.split(".").pop()?.toLowerCase() ?? "wav";
+                    const mimeMap: Record<string, string> = {
+                      wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4",
+                      aac: "audio/aac", ogg: "audio/ogg", webm: "audio/webm",
+                      flac: "audio/flac",
+                    };
+                    const blob = new Blob([bytes], { type: mimeMap[ext] ?? "audio/wav" });
                     audio.src = URL.createObjectURL(blob);
                     audio.onended = () => setPlaying(false);
                     void audio.play();

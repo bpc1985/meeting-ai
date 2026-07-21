@@ -59,6 +59,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   }),
   writeFile: vi.fn(async () => {}),
   mkdir: vi.fn(async () => {}),
+  stat: vi.fn(async () => ({ size: 10 * 1024 })),
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({
