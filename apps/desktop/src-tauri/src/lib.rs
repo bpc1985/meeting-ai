@@ -16,7 +16,12 @@ pub fn run() {
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
 
-            let audio_dir = app_data_dir.join("audio");
+            let audio_dir = app
+                .path()
+                .document_dir()
+                .expect("failed to resolve Documents directory")
+                .join("meeting-ai")
+                .join("audio");
             std::fs::create_dir_all(&audio_dir).expect("failed to create audio dir");
 
             let conn = db::init_db(&app_data_dir).expect("failed to initialize database");
@@ -54,7 +59,7 @@ pub fn run() {
             audio::recorder::resume_recording,
             audio::recorder::stop_recording,
             // audio import
-            audio::import::import_audio,
+            audio::import::import_meeting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,6 +7,14 @@
     "core:default",
     "shell:allow-open",
     "dialog:default",
-    "fs:default"
+    "fs:default",
+    "fs:allow-create",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:scope-document-recursive",
+    "fs:scope-temp-recursive",
+    "fs:scope-appcache-recursive",
+    "fs:scope-appdata-recursive",
+    "fs:allow-stat"
   ]
 }

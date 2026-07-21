@@ -6,6 +6,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     // Default mock responses per command
     if (cmd === "list_meetings") return [];
     if (cmd === "create_meeting") return { id: "new-meeting", title: args?.title ?? "Test", status: "draft" };
+    if (cmd === "import_meeting") return { id: "imported-meeting", title: args?.title ?? "Imported", audio_path: "/tmp/imported.wav", duration_secs: 0, status: "draft", created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" };
     if (cmd === "get_meeting") return { id: "test-meeting", title: "Test Meeting", audio_path: "/tmp/test.wav", duration_secs: 300, status: "transcribed", created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" };
     if (cmd === "get_segments") return [{ id: "s1", meeting_id: "test", speaker_label: "Alice", text: "Hello", start_secs: 0, end_secs: 5, sequence: 0 }];
     if (cmd === "get_summary") return null;
@@ -30,6 +31,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 // Mock Tauri dialog
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: vi.fn(async () => "/tmp/export.txt"),
+  open: vi.fn(async () => null),
 }));
 
 // Mock Tauri FS plugin (already handled by pipeline tests separately)

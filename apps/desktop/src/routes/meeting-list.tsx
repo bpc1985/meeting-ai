@@ -36,15 +36,17 @@ export function MeetingListPage() {
     });
     if (!selected) return;
 
+    setImportError(null);
     setCreating(true);
     try {
-      const filePath = typeof selected === "string" ? selected : selected.path;
-      const fileName = filePath.split("/").pop() ?? filePath;
-      const meeting = await invoke<{ id: string }>("create_meeting", {
+      // dialog.open with multiple=false returns string | null (the path directly)
+      const filePath = selected as string;
+      // Split on both / and \ so Windows backslash paths yield just the file name.
+      const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
+      const meeting = await invoke<{ id: string; title: string; audio_path: string | null; duration_secs: number | null; status: string; created_at: string; updated_at: string }>("import_meeting", {
+        sourcePath: filePath,
         title: `Imported — ${fileName}`,
       });
-      const copiedPath = await invoke<string>("import_audio", { sourcePath: filePath });
-      await invoke("update_meeting", { id: meeting.id, audioPath: copiedPath });
       navigate(`/meeting/${meeting.id}`);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : String(err));

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "@tauri-apps/plugin-fs";
+import { readFile, writeFile, mkdir } from "@tauri-apps/plugin-fs";
 import { appCacheDir, join } from "@tauri-apps/api/path";
 
 /**
@@ -10,7 +10,7 @@ import { appCacheDir, join } from "@tauri-apps/api/path";
  * ponytail: MediaRecorder produces WebM/Opus, not MP3.
  * Whisper and Gemini both accept WebM natively, so this works for both providers.
  */
-export async function compressAudio(wavPath: string): Promise<string> {
+export async function compressAudio(wavPath: string): Promise<{ path: string; size: number }> {
   const audioBytes = await readFile(wavPath);
   const audioCtx = new AudioContext();
   const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer as ArrayBuffer);
@@ -42,10 +42,12 @@ export async function compressAudio(wavPath: string): Promise<string> {
   });
 
   const cacheDir = await appCacheDir();
+  // Ensure cache directory exists before writing compressed file
+  await mkdir(cacheDir, { recursive: true }).catch(() => {});
   const outPath = await join(cacheDir, `${crypto.randomUUID()}.webm`);
 
   const outBytes = new Uint8Array(await webmBlob.arrayBuffer());
   await writeFile(outPath, outBytes);
 
-  return outPath;
+  return { path: outPath, size: outBytes.length };
 }

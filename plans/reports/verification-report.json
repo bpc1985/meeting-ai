@@ -1,0 +1,100 @@
+[
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 42,
+    "summary": "copy_to_audio_dir doesn't ensure audio_dir exists before copy",
+    "failure_scenario": "Fresh install where audio_dir was never created, or user deleted the audio directory. std::fs::copy will fail with 'No such file or directory' (ENOENT).",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 52,
+    "summary": "dest.to_str().ok_or('Invalid UTF-8')? loses path on non-UTF-8 Windows/Linux paths",
+    "failure_scenario": "On Windows with non-UTF-8 paths (rare but possible via legacy codepages), or Linux with non-UTF-8 filenames. PathBuf::to_str() returns None for non-UTF-8 paths, causing empty audio_path in DB -> broken playback.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 58,
+    "summary": "DB error handler ignores remove_file failure (let _ = std::fs::remove_file(&copied_path))",
+    "failure_scenario": "DB insert fails (e.g., constraint violation, disk full), AND remove_file fails (file locked by AV, permission denied, filesystem error). Orphan file remains on disk with no DB row.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 13,
+    "summary": "validate_source only checks exists(), not is_file()",
+    "failure_scenario": "User passes a directory path (e.g., /home/user/Music). exists() returns true, is_file() would be false. copy_to_audio_dir calls std::fs::copy which fails with 'Is a directory' error.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src/routes/meeting-list.tsx",
+    "line": 45,
+    "summary": "invoke<{ id: string }> type too narrow, Rust returns full Meeting",
+    "failure_scenario": "TypeScript type says only { id: string }, but Rust returns full Meeting struct (id, title, audio_path, duration_secs, created_at, updated_at, status). TS will error if code accesses meeting.title, meeting.audio_path, etc. Line 49 uses meeting.id which works, but any future access breaks.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 22,
+    "summary": "Error format changed: 'Unsupported file format: .{ext}' vs old '{ext}'",
+    "failure_scenario": "Frontend error matching (if any) expects old format. Also test line 112 checks err.starts_with('Unsupported file format') which still passes. But if frontend had exact string matching, it would break.",
+    "verdict": "PLAUSIBLE"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 84,
+    "summary": "DB lock error message includes 'DB lock poisoned' but original error lost (e.to_string())",
+    "failure_scenario": "Mutex poisoned (thread panicked while holding lock). Error shows 'DB lock poisoned: PoisonError { ... }' but actual panic cause is lost. Hard to debug root cause.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src/test-setup.ts",
+    "line": 9,
+    "summary": "Mock returns duration_secs in create_meeting but not in import_meeting",
+    "failure_scenario": "Test calls import_meeting and expects duration_secs (e.g., groupByDate function in meeting-list.tsx line 205 expects duration_secs). Mock returns undefined -> groupByDate crashes or sorts wrong.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 36,
+    "summary": "No // ponytail: comment marking atomic import+rollback as deliberate simplification",
+    "failure_scenario": "Code comment at lines 36-38 describes the atomic behavior but doesn't use the // ponytail: convention per project CLAUDE.md. Maintainers may not recognize this as a deliberate tradeoff with upgrade path.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src/routes/meeting-list.tsx",
+    "line": 38,
+    "summary": "Two 'Import Audio' buttons (header + empty state) duplicate component logic",
+    "failure_scenario": "Header button (line ~70) and empty state button (line ~120) both call handleImportAudio. Not a bug but duplication. Any change to import UX needs updating both.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src/routes/meeting-list.tsx",
+    "line": 44,
+    "summary": "file.split('/').pop() breaks on Windows \\ paths",
+    "failure_scenario": "Wait - line 44 actually uses filePath.split(/[\\\\/]/).pop() which handles both. This candidate is FACTUALLY WRONG - the code already handles Windows paths.",
+    "verdict": "REFUTED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 79,
+    "summary": "async fn import_meeting doesn't .await anything, could be sync fn",
+    "failure_scenario": "Function is marked async but does no await. Tauri commands can be sync or async; making it async adds unnecessary overhead (Future allocation). No functional bug, just unnecessary async.",
+    "verdict": "PLAUSIBLE"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 31,
+    "summary": "validate_source does exists() check, then copy_to_audio_dir does std::fs::copy which also checks existence. Double stat syscall",
+    "failure_scenario": "validate_source calls source.exists() (stat), then copy_to_audio_dir calls std::fs::copy which does its own stat. Two syscalls for same check. Negligible perf impact but real duplication.",
+    "verdict": "CONFIRMED"
+  },
+  {
+    "file": "apps/desktop/src-tauri/src/audio/import.rs",
+    "line": 7,
+    "summary": "ALLOWED_EXTS constant not shared with frontend (could diverge)",
+    "failure_scenario": "Frontend meeting-list.tsx line 35 has its own array: ['wav', 'mp3', 'm4a', 'aac', 'ogg', 'flac', 'webm']. If backend adds 'opus' but frontend doesn't, user can select file but import fails. Or vice versa.",
+    "verdict": "CONFIRMED"
+  }
+]

@@ -58,7 +58,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
     return new Uint8Array(buffer);
   }),
   writeFile: vi.fn(async () => {}),
-  stat: vi.fn(async () => ({ size: 10 * 1024 })), // 10KB = small, no chunking
+  mkdir: vi.fn(async () => {}),
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({

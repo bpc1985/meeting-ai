@@ -21,17 +21,22 @@ export function MeetingDetailPage() {
   const transcribe = useTranscription();
   const [summaryTab, setSummaryTab] = useState<"overview" | "decisions" | "actions" | "risks">("overview");
   const [transcribing, setTranscribing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   const transcribeLabel = transcribing
     ? (transcribe.progress
-        ? `Transcribing ${transcribe.progress.current}/${transcribe.progress.total}...`
+        ? `Transcribing ${transcribe.progress.current}/${transcribe.progress.total} (${Math.round((transcribe.progress.current / transcribe.progress.total) * 100)}%)...`
         : "Transcribing...")
     : "Transcribe";
 
   const handleTranscribe = async () => {
     if (!id) return;
     setTranscribing(true);
-    try { await transcribe.mutateAsync(id); } finally { setTranscribing(false); }
+    setError(null);
+    try { await transcribe.mutateAsync(id); } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally { setTranscribing(false); }
   };
 
   const handleExport = async (format: "txt" | "srt") => {
@@ -62,34 +67,56 @@ export function MeetingDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             {meeting?.audio_path && (
-              <button
-                onClick={async () => {
-                  const audio = document.getElementById("audio-player") as HTMLAudioElement | null;
-                  if (!audio || !meeting.audio_path) return;
-                  if (audio.src) {
-                    audio.paused ? void audio.play() : audio.pause();
-                    return;
-                  }
-                  // ponytail: read via Tauri fs, create blob URL for playback
-                  const { readFile } = await import("@tauri-apps/plugin-fs");
-                  const bytes = await readFile(meeting.audio_path);
-                  const blob = new Blob([bytes], { type: "audio/wav" });
-                  audio.src = URL.createObjectURL(blob);
-                  void audio.play();
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-md transition-all"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                Play
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async (e) => {
+                    const audio = document.getElementById("audio-player") as HTMLAudioElement | null;
+                    if (!audio || !meeting.audio_path) return;
+                    if (playing) {
+                      audio.pause();
+                      setPlaying(false);
+                      return;
+                    }
+                    // ponytail: read via Tauri fs, create blob URL for playback
+                    const { readFile } = await import("@tauri-apps/plugin-fs");
+                    const bytes = await readFile(meeting.audio_path);
+                    const blob = new Blob([bytes], { type: "audio/wav" });
+                    audio.src = URL.createObjectURL(blob);
+                    audio.onended = () => setPlaying(false);
+                    void audio.play();
+                    setPlaying(true);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-md transition-all"
+                >
+                  {playing ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                  )}
+                  {playing ? "Stop" : "Play"}
+                </button>
+              </div>
             )}
             <audio id="audio-player" className="hidden" />
+            {error && (
+              <div className="flex items-center gap-2 bg-error-muted border border-error/20 text-error text-xs rounded-md px-3 py-1.5">
+                <span>Transcription failed: {error}</span>
+                <button onClick={() => setError(null)} className="text-error/60 hover:text-error ml-auto">&times;</button>
+              </div>
+            )}
             {(!segments || segments.length === 0) && meeting?.audio_path && (
-              <button onClick={handleTranscribe} disabled={transcribing}
-                className="flex items-center gap-2 px-3 py-1.5 bg-accent text-bg-deep font-semibold rounded-md text-xs hover:bg-accent-hover disabled:opacity-50 transition-all">
-                {transcribing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                {transcribing ? transcribeLabel : "Transcribe"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleTranscribe} disabled={transcribing}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-accent text-bg-deep font-semibold rounded-md text-xs hover:bg-accent-hover disabled:opacity-50 transition-all">
+                  {transcribing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {transcribing ? transcribeLabel : "Transcribe"}
+                </button>
+                {transcribing && transcribe.progress && (
+                  <div className="w-32 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                    <div className="h-full bg-accent transition-all duration-300" style={{ width: `${Math.round((transcribe.progress.current / transcribe.progress.total) * 100)}%` }} />
+                  </div>
+                )}
+              </div>
             )}
             {segments && segments.length > 0 && (
               <div className="flex items-center gap-1">

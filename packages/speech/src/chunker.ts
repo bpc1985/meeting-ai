@@ -1,7 +1,6 @@
 import type { SpeechProvider, TranscriptResult, TranscriptSegment } from "./types";
 import { compressAudio } from "./compressor";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { stat } from "@tauri-apps/plugin-fs";
 
 const MAX_CHUNK_BYTES = 24 * 1024 * 1024; // 24MB, leave headroom under 25MB
 
@@ -16,10 +15,9 @@ export async function transcribeWithChunking(
   onProgress?: (current: number, total: number) => void
 ): Promise<TranscriptResult> {
   // Step 1: compress to MP3
-  const compressedPath = await compressAudio(audioPath);
-  const fileStat = await stat(compressedPath);
+  const { path: compressedPath, size: compressedSize } = await compressAudio(audioPath);
 
-  if (fileStat.size <= MAX_CHUNK_BYTES) {
+  if (compressedSize <= MAX_CHUNK_BYTES) {
     return provider.transcribe(compressedPath, apiKey);
   }
 
@@ -29,7 +27,7 @@ export async function transcribeWithChunking(
   const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer as ArrayBuffer);
 
   // Step 3: find silence boundaries
-  const splitPoints = findSilenceBoundaries(audioBuffer, MAX_CHUNK_BYTES, fileStat.size);
+  const splitPoints = findSilenceBoundaries(audioBuffer, MAX_CHUNK_BYTES, compressedSize);
   await audioCtx.close();
 
   // Step 4: extract chunks and transcribe
